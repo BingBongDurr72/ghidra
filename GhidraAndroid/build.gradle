@@ -15,15 +15,25 @@
  */
 
 /**
- * Android application module for Ghidra.
+ * Android application module for Ghidra (GhidraDroid).
  *
  * This module provides an Android wrapper around Ghidra's headless
  * analysis engine, allowing binary analysis to be performed on Android
  * devices without requiring the desktop Swing UI.
  *
+ * Architecture overview:
+ *   - GhidraAnalysisService  – foreground service / AIDL server that drives
+ *                              Ghidra's headless analysis pipeline.
+ *   - GhidraAndroidActivity  – launcher screen; file picker + analysis controls.
+ *   - ProjectDashboardActivity – lists / deletes saved Ghidra projects.
+ *   - BinaryInfoActivity     – displays binary metadata after analysis.
+ *   - DecompilerViewActivity – renders decompiled C code in a WebView.
+ *   - libdecompiler.so       – native Ghidra decompiler (C++, NDK-built).
+ *
  * Prerequisites:
  *   - Android SDK installed and ANDROID_HOME / ANDROID_SDK_ROOT set
  *   - Android Gradle Plugin (AGP) 8.x
+ *   - Android NDK r25+ (for the native decompiler build)
  *   - Ghidra core libraries available (build the main project first)
  *
  * Build:
@@ -56,6 +66,17 @@ android {
         versionName project.findProperty('ghidra.version') ?: '1.0'
 
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+
+        // Native build: compile the Ghidra decompiler for arm64 and arm32.
+        externalNativeBuild {
+            cmake {
+                cppFlags '-std=c++11'
+                arguments '-DANDROID_STL=c++_shared'
+            }
+        }
+        ndk {
+            abiFilters 'arm64-v8a', 'armeabi-v7a'
+        }
     }
 
     buildTypes {
@@ -71,6 +92,14 @@ android {
         coreLibraryDesugaringEnabled true
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
+    }
+
+    // Wire up CMakeLists.txt for the native decompiler library.
+    externalNativeBuild {
+        cmake {
+            path 'src/main/cpp/CMakeLists.txt'
+            version '3.22.1'
+        }
     }
 
     packagingOptions {
