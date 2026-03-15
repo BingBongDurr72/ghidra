@@ -15,6 +15,8 @@
  */
 apply plugin: 'eclipse'
 
+import java.security.MessageDigest
+
 apply from: 'gradle/root/eclipse.gradle'
 apply from: "gradle/support/eclipseLauncher.gradle"
 apply from: "gradle/support/loadApplicationProperties.gradle"
@@ -73,20 +75,24 @@ allprojects {
  *  Use flat directory-style repository if flatRepo directory is present.
  *********************************************************************************/
 def flatRepo = file("${DEPS_DIR}/flatRepo") 
-if (flatRepo.isDirectory()) {
-	allprojects {
-		repositories {
-			mavenLocal()
-			mavenCentral()
-			flatDir name: "flat", dirs:["$flatRepo"]
-		}
-	}
-}
-else {	
-	File f = file("ghidra.repos.config")
-	if (!f.exists()) {
-		throw new GradleException("\n\n\n\tUnable to find the local maven repo." +  
-			"  Ensure you have created the ${flatRepo.getName()} directory or ${f.getName()} file.\n\n\n");
+flatRepo.mkdirs()
+ensureFlatRepoDependency(
+	flatRepo,
+	"java-sarif-2.1-modified.jar",
+	"https://github.com/NationalSecurityAgency/ghidra-data/raw/Ghidra_${RELEASE_VERSION}/lib/java-sarif-2.1-modified.jar",
+	"7f736566494756d271aa5e4b1af6c89dc50d074ab1c6374a47df822264226b01"
+)
+ensureFlatRepoDependency(
+	flatRepo,
+	"AXMLPrinter2.jar",
+	"https://github.com/digitalsleuth/AXMLPrinter2/raw/main/AXMLPrinter2.jar",
+	"00ed038eb6abaf6ddec8d202a3ed7a81b521458f4cd459948115cfd02ff59d6d"
+)
+allprojects {
+	repositories {
+		mavenLocal()
+		mavenCentral()
+		flatDir name: "flat", dirs:["$flatRepo"]
 	}
 }
 
@@ -150,6 +156,38 @@ def checkGradleVersion() {
 	if (GradleVersion.current() < min || (max && GradleVersion.current() >= max)) {
 		throw new GradleException("Requires ${gradleRange}, but was run with $gradle.gradleVersion")
 	}
+}
+
+def ensureFlatRepoDependency(File flatRepoDir, String name, String url, String expectedSha256) {
+	File target = file("${flatRepoDir}/${name}")
+	if (target.isFile() && sha256(target) == expectedSha256) {
+		return
+	}
+
+	logger.lifecycle("Bootstrapping flatRepo dependency: ${name}")
+	target.withOutputStream { out ->
+		new URL(url).openStream().withCloseable { input ->
+			out << input
+		}
+	}
+
+	String actualSha = sha256(target)
+	if (actualSha != expectedSha256) {
+		target.delete()
+		throw new GradleException("Checksum mismatch for ${name}. Expected ${expectedSha256} but got ${actualSha}")
+	}
+}
+
+def sha256(File file) {
+	MessageDigest digest = MessageDigest.getInstance("SHA-256")
+	file.withInputStream { input ->
+		byte[] buffer = new byte[8192]
+		int bytesRead
+		while ((bytesRead = input.read(buffer)) != -1) {
+			digest.update(buffer, 0, bytesRead)
+		}
+	}
+	return digest.digest().collect { String.format("%02x", it) }.join()
 }
 
 

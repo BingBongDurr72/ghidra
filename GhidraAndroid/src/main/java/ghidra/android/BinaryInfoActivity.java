@@ -56,6 +56,7 @@ public class BinaryInfoActivity extends AppCompatActivity {
 
     private TextView textFileName;
     private TextView textFileSize;
+    private TextView textFormat;
     private TextView textArchitecture;
     private TextView textEndianness;
     private TextView textEntryPoint;
@@ -87,6 +88,7 @@ public class BinaryInfoActivity extends AppCompatActivity {
 
         textFileName       = findViewById(R.id.text_file_name);
         textFileSize       = findViewById(R.id.text_file_size);
+        textFormat         = findViewById(R.id.text_format);
         textArchitecture   = findViewById(R.id.text_architecture);
         textEndianness     = findViewById(R.id.text_endianness);
         textEntryPoint     = findViewById(R.id.text_entry_point);
@@ -141,10 +143,14 @@ public class BinaryInfoActivity extends AppCompatActivity {
             long sizeBytes = obj.optLong("file_size", -1);
             textFileSize.setText(sizeBytes >= 0
                     ? formatFileSize(sizeBytes)
-                    : getString(R.string.value_unknown));
-            textArchitecture.setText(obj.optString("architecture", getString(R.string.value_unknown)));
-            textEndianness.setText(obj.optString("endianness",     getString(R.string.value_unknown)));
-            textEntryPoint.setText(obj.optString("entry_point",    getString(R.string.value_unknown)));
+                    : getString(R.string.value_not_available));
+            textFormat.setText(obj.optString("format",        getString(R.string.value_not_available)));
+            textArchitecture.setText(obj.optString("architecture",
+                    getString(R.string.value_not_available)));
+            textEndianness.setText(obj.optString("endianness",
+                    getString(R.string.value_not_available)));
+            textEntryPoint.setText(obj.optString("entry_point",
+                    getString(R.string.value_not_available)));
             textProjectName.setText(obj.optString("project_name",  getString(R.string.value_unknown)));
         }
         catch (JSONException e) {

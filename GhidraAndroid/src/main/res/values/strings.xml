@@ -53,15 +53,18 @@
     <!-- Binary info labels -->
     <string name="label_file_name">File:</string>
     <string name="label_file_size">Size:</string>
+    <string name="label_format">Format:</string>
     <string name="label_architecture">Architecture:</string>
     <string name="label_endianness">Endianness:</string>
     <string name="label_entry_point">Entry point:</string>
     <string name="label_project_name">Project:</string>
     <string name="value_unknown">—</string>
+    <string name="value_not_available">Not available</string>
+    <string name="value_not_applicable">Not applicable</string>
 
     <!-- Decompiler view -->
     <string name="hint_address">Function address (e.g. 0x00401000)</string>
-    <string name="decompiler_placeholder">Enter a function address above and tap Go.</string>
+    <string name="decompiler_prompt">Enter a function address above and tap Go.</string>
     <string name="decompiler_no_result">/* No decompiled output available for %1$s */</string>
 
     <!-- Project dashboard -->

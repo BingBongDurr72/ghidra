@@ -75,7 +75,7 @@ ext.deps = [
 	],
 	[
 		name: "AXMLPrinter2.jar",
-		url: "https://storage.googleapis.com/google-code-archive-downloads/v2/code.google.com/android4me/AXMLPrinter2.jar",
+		url: "https://github.com/digitalsleuth/AXMLPrinter2/raw/main/AXMLPrinter2.jar",
 		sha256: "00ed038eb6abaf6ddec8d202a3ed7a81b521458f4cd459948115cfd02ff59d6d",
 		destination: FLAT_REPO_DIR
 	],

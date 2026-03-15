@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+import java.security.MessageDigest
+
 /**
  * Android application module for Ghidra (GhidraDroid).
  *
@@ -34,7 +36,7 @@
  *   - Android SDK installed and ANDROID_HOME / ANDROID_SDK_ROOT set
  *   - Android Gradle Plugin (AGP) 8.x
  *   - Android NDK r25+ (for the native decompiler build)
- *   - Ghidra core libraries available (build the main project first)
+ *   - Local flat-repo dependencies available (bootstrapped automatically)
  *
  * Build:
  *   ./gradlew :GhidraAndroid:assembleDebug
@@ -50,9 +52,7 @@ buildscript {
     }
 }
 
-plugins {
-    id 'com.android.application'
-}
+apply plugin: 'com.android.application'
 
 android {
     namespace 'ghidra.android'
@@ -121,6 +121,21 @@ repositories {
     mavenCentral()
 }
 
+def flatRepoDir = rootProject.file("dependencies/flatRepo")
+def flatRepoArtifacts = [
+    [
+        name: 'java-sarif-2.1-modified.jar',
+        url: "https://github.com/NationalSecurityAgency/ghidra-data/raw/Ghidra_${rootProject.RELEASE_VERSION}/lib/java-sarif-2.1-modified.jar",
+        sha256: '7f736566494756d271aa5e4b1af6c89dc50d074ab1c6374a47df822264226b01'
+    ],
+    [
+        name: 'AXMLPrinter2.jar',
+        url: 'https://github.com/digitalsleuth/AXMLPrinter2/raw/main/AXMLPrinter2.jar',
+        sha256: '00ed038eb6abaf6ddec8d202a3ed7a81b521458f4cd459948115cfd02ff59d6d'
+    ]
+]
+def processorRoot = rootProject.file('Ghidra/Processors').absolutePath
+
 dependencies {
     // Android desugaring support (required for Java 17 APIs on older runtimes)
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'
@@ -130,22 +145,69 @@ dependencies {
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
     implementation 'com.google.android.material:material:1.11.0'
 
-    // Ghidra utility / framework JARs (produced by the main Ghidra build).
-    // Adjust the path below if your Ghidra build output is in a different location.
-    def ghidraBuildDir = rootProject.file("build/dist")
-    if (ghidraBuildDir.exists()) {
-        implementation fileTree(dir: ghidraBuildDir, include: ['**/*.jar'],
-            exclude: [
-                // Exclude Swing-only JARs that cannot run on Android
-                '**/docking*.jar',
-                '**/Gui*.jar',
-                '**/Help*.jar',
-                '**/Graph*.jar'
-            ])
+    // Core Ghidra modules required for headless import, analysis, and decompilation.
+    implementation project(':Base')
+    implementation project(':Decompiler')
+    implementation project(':FileFormats')
+
+    // Processor modules provide language definitions used during binary import.
+    rootProject.subprojects.findAll {
+        it.projectDir.absolutePath.startsWith(processorRoot)
+    }.sort { it.path }.each { processorProject ->
+        implementation processorProject
     }
 
     // Testing
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+}
+
+if (!rootProject.tasks.names.contains('bootstrapFlatRepoDependencies')) {
+    rootProject.tasks.register('bootstrapFlatRepoDependencies') {
+        outputs.files(flatRepoArtifacts.collect { artifact -> new File(flatRepoDir, artifact.name) })
+
+        doLast {
+            flatRepoDir.mkdirs()
+            flatRepoArtifacts.each { artifact ->
+                File target = new File(flatRepoDir, artifact.name)
+                if (target.exists() && sha256(target) == artifact.sha256) {
+                    return
+                }
+
+                ant.get(src: artifact.url, dest: target, skipexisting: false, verbose: true)
+
+                String downloadedSha = sha256(target)
+                if (downloadedSha != artifact.sha256) {
+                    target.delete()
+                    throw new GradleException(
+                        "Checksum mismatch for ${artifact.name}. Expected ${artifact.sha256} but got ${downloadedSha}."
+                    )
+                }
+            }
+        }
+    }
+}
+
+tasks.named('preBuild').configure {
+    dependsOn rootProject.tasks.named('bootstrapFlatRepoDependencies')
+    doFirst {
+        if (!flatRepoArtifacts.every { artifact -> new File(flatRepoDir, artifact.name).isFile() }) {
+            throw new GradleException(
+                "GhidraAndroid requires flat-repo dependencies in ${flatRepoDir}."
+            )
+        }
+    }
+}
+
+String sha256(File file) {
+    MessageDigest digest = MessageDigest.getInstance('SHA-256')
+    file.withInputStream { input ->
+        byte[] buffer = new byte[8192]
+        int bytesRead
+        while ((bytesRead = input.read(buffer)) != -1) {
+            digest.update(buffer, 0, bytesRead)
+        }
+    }
+    return digest.digest().collect { String.format('%02x', it) }.join()
 }

@@ -113,8 +113,8 @@ public class DecompilerViewActivity extends AppCompatActivity {
             }
         });
 
-        // Show a welcome placeholder.
-        webViewOutput.loadData(buildHtml(getString(R.string.decompiler_placeholder)),
+        // Show an initial prompt.
+        webViewOutput.loadData(buildHtml(getString(R.string.decompiler_prompt)),
                 "text/html", "UTF-8");
     }
 
