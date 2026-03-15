@@ -1,0 +1,122 @@
+/* ###
+ * IP: GHIDRA
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/**
+ * Android application module for Ghidra.
+ *
+ * This module provides an Android wrapper around Ghidra's headless
+ * analysis engine, allowing binary analysis to be performed on Android
+ * devices without requiring the desktop Swing UI.
+ *
+ * Prerequisites:
+ *   - Android SDK installed and ANDROID_HOME / ANDROID_SDK_ROOT set
+ *   - Android Gradle Plugin (AGP) 8.x
+ *   - Ghidra core libraries available (build the main project first)
+ *
+ * Build:
+ *   ./gradlew :GhidraAndroid:assembleDebug
+ */
+
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.2.0'
+    }
+}
+
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'ghidra.android'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'ghidra.android'
+        minSdk 26          // Android 8.0 (Oreo) – required for Java 8 streams / nio
+        targetSdk 34
+        versionCode 1
+        versionName project.findProperty('ghidra.version') ?: '1.0'
+
+        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        // Ghidra requires Java 17+ language features; use core library desugaring
+        // to make them available on older Android runtimes.
+        coreLibraryDesugaringEnabled true
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    packagingOptions {
+        // Ghidra ships duplicate META-INF entries across its many JARs.
+        resources {
+            excludes += [
+                'META-INF/LICENSE',
+                'META-INF/LICENSE.txt',
+                'META-INF/NOTICE',
+                'META-INF/NOTICE.txt',
+                'META-INF/*.kotlin_module'
+            ]
+        }
+    }
+}
+
+repositories {
+    google()
+    mavenCentral()
+}
+
+dependencies {
+    // Android desugaring support (required for Java 17 APIs on older runtimes)
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'
+
+    // AndroidX UI libraries
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation 'com.google.android.material:material:1.11.0'
+
+    // Ghidra utility / framework JARs (produced by the main Ghidra build).
+    // Adjust the path below if your Ghidra build output is in a different location.
+    def ghidraBuildDir = rootProject.file("build/dist")
+    if (ghidraBuildDir.exists()) {
+        implementation fileTree(dir: ghidraBuildDir, include: ['**/*.jar'],
+            exclude: [
+                // Exclude Swing-only JARs that cannot run on Android
+                '**/docking*.jar',
+                '**/Gui*.jar',
+                '**/Help*.jar',
+                '**/Graph*.jar'
+            ])
+    }
+
+    // Testing
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+}

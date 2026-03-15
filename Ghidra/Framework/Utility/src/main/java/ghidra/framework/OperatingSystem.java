@@ -20,6 +20,7 @@ public enum OperatingSystem {
 	LINUX("Linux"),
 	MAC_OS_X("Mac OS X"),
 	FREE_BSD("FreeBSD"),
+	ANDROID("Android"),
 	UNSUPPORTED("Unsupported Operating System");
 
 	/**
@@ -34,7 +35,22 @@ public enum OperatingSystem {
 		this.operatingSystemName = operatingSystemName;
 	}
 
+	/**
+	 * Returns true if the current runtime is an Android environment.
+	 * Android reports {@code os.name} as "Linux", so this check uses
+	 * the {@code java.vm.name} system property ("Dalvik" or "ART") as a
+	 * more reliable indicator.
+	 */
+	private static boolean isAndroid() {
+		String vmName = System.getProperty("java.vm.name");
+		return vmName != null &&
+			(vmName.equalsIgnoreCase("Dalvik") || vmName.equalsIgnoreCase("ART"));
+	}
+
 	private static OperatingSystem findCurrentOperatingSystem() {
+		if (isAndroid()) {
+			return ANDROID;
+		}
 		String operatingSystemNameProperty = System.getProperty("os.name");
 		for (OperatingSystem operatingSystem : values()) {
 			if (operatingSystemNameProperty.toLowerCase().indexOf(

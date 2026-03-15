@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  * IP: GHIDRA
+  *
+  * Licensed under the Apache License, Version 2.0 (the "License");
+  * you may not use this file except in compliance with the License.
+  * You may obtain a copy of the License at
+  *
+  *      http://www.apache.org/licenses/LICENSE-2.0
+  *
+  * Unless required by applicable law or agreed to in writing, software
+  * distributed under the License is distributed on an "AS IS" BASIS,
+  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  * See the License for the specific language governing permissions and
+  * limitations under the License.
+  -->
+<resources>
+    <string name="app_name">Ghidra</string>
+
+    <!-- Buttons -->
+    <string name="button_select_file">Select Binary File…</string>
+    <string name="button_analyze">Analyze</string>
+
+    <!-- File chooser -->
+    <string name="chooser_title">Choose binary file to analyze</string>
+
+    <!-- Status messages -->
+    <string name="status_idle">Select a binary file to begin analysis.</string>
+    <string name="status_file_selected">File selected: %1$s</string>
+    <string name="status_copying_file">Copying file to app storage…</string>
+    <string name="status_analysis_started">Analysis started…</string>
+    <string name="status_analysis_complete">Analysis complete.</string>
+
+    <!-- Error messages -->
+    <string name="error_no_file_selected">No file selected.</string>
+    <string name="error_copy_failed">Failed to copy file: %1$s</string>
+    <string name="error_analysis_failed">Analysis failed: %1$s</string>
+
+    <!-- Notification channel -->
+    <string name="notif_channel_name">Ghidra Analysis</string>
+    <string name="notif_channel_desc">Shows progress of ongoing binary analysis jobs</string>
+    <string name="notif_analysis_running">Ghidra analysis running…</string>
+</resources>
