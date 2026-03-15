@@ -28,30 +28,26 @@
  *   - ProjectDashboardActivity – lists / deletes saved Ghidra projects.
  *   - BinaryInfoActivity     – displays binary metadata after analysis.
  *   - DecompilerViewActivity – renders decompiled C code in a WebView.
- *   - libdecompiler.so       – native Ghidra decompiler (C++, NDK-built).
+ *   - libdecompiler.so       – native Ghidra decompiler (C++, NDK-built, optional).
  *
  * Prerequisites:
  *   - Android SDK installed and ANDROID_HOME / ANDROID_SDK_ROOT set
- *   - Android Gradle Plugin (AGP) 8.x
- *   - Android NDK r25+ (for the native decompiler build)
- *   - Ghidra core libraries available (build the main project first)
+ *   - Android Gradle Plugin (AGP) 8.2.x
+ *   - Ghidra core libraries available (build the main project first, optional)
  *
- * Build:
- *   ./gradlew :GhidraAndroid:assembleDebug
+ * Standalone build (from the GhidraAndroid/ directory):
+ *   ./gradlew assembleDebug
+ *
+ * Build from the repository root:
+ *   GhidraAndroid/gradlew -p GhidraAndroid assembleDebug
+ *
+ * Native decompiler build (optional):
+ *   Set the gradle property 'buildNativeDecompiler=true' and ensure NDK r25+ is installed.
+ *   The NDK build is disabled by default to allow the APK to be produced without NDK.
  */
 
-buildscript {
-    repositories {
-        google()
-        mavenCentral()
-    }
-    dependencies {
-        classpath 'com.android.tools.build:gradle:8.2.0'
-    }
-}
-
 plugins {
-    id 'com.android.application'
+    id 'com.android.application' version '8.2.0'
 }
 
 android {
@@ -67,15 +63,19 @@ android {
 
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
 
-        // Native build: compile the Ghidra decompiler for arm64 and arm32.
-        externalNativeBuild {
-            cmake {
-                cppFlags '-std=c++11'
-                arguments '-DANDROID_STL=c++_shared'
+        // Native build for the Ghidra decompiler (C++) is optional.
+        // Enable by setting the Gradle property 'buildNativeDecompiler=true'.
+        // The NDK and Android CMake must be installed.
+        if (project.findProperty('buildNativeDecompiler') == 'true') {
+            externalNativeBuild {
+                cmake {
+                    cppFlags '-std=c++11'
+                    arguments '-DANDROID_STL=c++_shared'
+                }
             }
-        }
-        ndk {
-            abiFilters 'arm64-v8a', 'armeabi-v7a'
+            ndk {
+                abiFilters 'arm64-v8a', 'armeabi-v7a'
+            }
         }
     }
 
@@ -87,18 +87,22 @@ android {
     }
 
     compileOptions {
-        // Ghidra requires Java 17+ language features; use core library desugaring
-        // to make them available on older Android runtimes.
-        coreLibraryDesugaringEnabled true
-        sourceCompatibility JavaVersion.VERSION_17
-        targetCompatibility JavaVersion.VERSION_17
+        // Core library desugaring is only needed when using AndroidX / Java 17 features.
+        // Disabled here so the APK can be built without the Google Maven dependency.
+        // Re-enable (coreLibraryDesugaringEnabled = true) if AndroidX is added back.
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
     }
 
     // Wire up CMakeLists.txt for the native decompiler library.
-    externalNativeBuild {
-        cmake {
-            path 'src/main/cpp/CMakeLists.txt'
-            version '3.22.1'
+    // Only enabled when buildNativeDecompiler=true is passed to Gradle.
+    if (project.findProperty('buildNativeDecompiler') == 'true') {
+        externalNativeBuild {
+            cmake {
+                path 'src/main/cpp/CMakeLists.txt'
+                // Use the CMake version bundled with the Android SDK.
+                version '3.31.5'
+            }
         }
     }
 
@@ -122,13 +126,20 @@ repositories {
 }
 
 dependencies {
-    // Android desugaring support (required for Java 17 APIs on older runtimes)
-    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'
-
-    // AndroidX UI libraries
-    implementation 'androidx.appcompat:appcompat:1.6.1'
-    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
-    implementation 'com.google.android.material:material:1.11.0'
+    // NOTE: AndroidX and Material Components libraries are hosted exclusively on
+    // Google Maven (dl.google.com/dl/android/maven2/). If that repository is not
+    // accessible in your build environment, remove the three commented-out lines
+    // below and keep the platform-only build. The platform theme and standard
+    // Android Views used in the layouts are sufficient for a functional APK.
+    //
+    // To re-enable AndroidX / Material when network access is available:
+    //   1. Set coreLibraryDesugaringEnabled = true in compileOptions above
+    //   2. Change sourceCompatibility / targetCompatibility to VERSION_17
+    //   3. Uncomment the three lines below:
+    // coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'
+    // implementation 'androidx.appcompat:appcompat:1.6.1'
+    // implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    // implementation 'com.google.android.material:material:1.11.0'
 
     // Ghidra utility / framework JARs (produced by the main Ghidra build).
     // Adjust the path below if your Ghidra build output is in a different location.

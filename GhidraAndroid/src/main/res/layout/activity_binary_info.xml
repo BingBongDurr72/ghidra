@@ -16,151 +16,148 @@
   -->
 <ScrollView
     xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <androidx.constraintlayout.widget.ConstraintLayout
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:orientation="vertical"
         android:padding="16dp">
 
         <!-- File name -->
-        <TextView
-            android:id="@+id/label_file_name"
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/label_file_name"
-            android:textStyle="bold"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
-
-        <TextView
-            android:id="@+id/text_file_name"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:text="@string/value_unknown"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toEndOf="@id/label_file_name"
-            app:layout_constraintTop_toTopOf="@id/label_file_name" />
+            android:orientation="horizontal">
+            <TextView
+                android:id="@+id/label_file_name"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/label_file_name"
+                android:textStyle="bold" />
+            <TextView
+                android:id="@+id/text_file_name"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:text="@string/value_unknown" />
+        </LinearLayout>
 
         <!-- File size -->
-        <TextView
-            android:id="@+id/label_file_size"
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="@string/label_file_size"
-            android:textStyle="bold"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/label_file_name" />
-
-        <TextView
-            android:id="@+id/text_file_size"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:text="@string/value_unknown"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toEndOf="@id/label_file_size"
-            app:layout_constraintTop_toTopOf="@id/label_file_size" />
+            android:orientation="horizontal"
+            android:layout_marginTop="12dp">
+            <TextView
+                android:id="@+id/label_file_size"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/label_file_size"
+                android:textStyle="bold" />
+            <TextView
+                android:id="@+id/text_file_size"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:text="@string/value_unknown" />
+        </LinearLayout>
 
         <!-- Architecture -->
-        <TextView
-            android:id="@+id/label_architecture"
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="@string/label_architecture"
-            android:textStyle="bold"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/label_file_size" />
-
-        <TextView
-            android:id="@+id/text_architecture"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:text="@string/value_unknown"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toEndOf="@id/label_architecture"
-            app:layout_constraintTop_toTopOf="@id/label_architecture" />
+            android:orientation="horizontal"
+            android:layout_marginTop="12dp">
+            <TextView
+                android:id="@+id/label_architecture"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/label_architecture"
+                android:textStyle="bold" />
+            <TextView
+                android:id="@+id/text_architecture"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:text="@string/value_unknown" />
+        </LinearLayout>
 
         <!-- Endianness -->
-        <TextView
-            android:id="@+id/label_endianness"
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="@string/label_endianness"
-            android:textStyle="bold"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/label_architecture" />
-
-        <TextView
-            android:id="@+id/text_endianness"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:text="@string/value_unknown"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toEndOf="@id/label_endianness"
-            app:layout_constraintTop_toTopOf="@id/label_endianness" />
+            android:orientation="horizontal"
+            android:layout_marginTop="12dp">
+            <TextView
+                android:id="@+id/label_endianness"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/label_endianness"
+                android:textStyle="bold" />
+            <TextView
+                android:id="@+id/text_endianness"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:text="@string/value_unknown" />
+        </LinearLayout>
 
         <!-- Entry point -->
-        <TextView
-            android:id="@+id/label_entry_point"
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="@string/label_entry_point"
-            android:textStyle="bold"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/label_endianness" />
-
-        <TextView
-            android:id="@+id/text_entry_point"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:fontFamily="monospace"
-            android:text="@string/value_unknown"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toEndOf="@id/label_entry_point"
-            app:layout_constraintTop_toTopOf="@id/label_entry_point" />
+            android:orientation="horizontal"
+            android:layout_marginTop="12dp">
+            <TextView
+                android:id="@+id/label_entry_point"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/label_entry_point"
+                android:textStyle="bold" />
+            <TextView
+                android:id="@+id/text_entry_point"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:fontFamily="monospace"
+                android:text="@string/value_unknown" />
+        </LinearLayout>
 
         <!-- Project name -->
-        <TextView
-            android:id="@+id/label_project_name"
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="@string/label_project_name"
-            android:textStyle="bold"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/label_entry_point" />
-
-        <TextView
-            android:id="@+id/text_project_name"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:text="@string/value_unknown"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toEndOf="@id/label_project_name"
-            app:layout_constraintTop_toTopOf="@id/label_project_name" />
+            android:orientation="horizontal"
+            android:layout_marginTop="12dp">
+            <TextView
+                android:id="@+id/label_project_name"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/label_project_name"
+                android:textStyle="bold" />
+            <TextView
+                android:id="@+id/text_project_name"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:text="@string/value_unknown" />
+        </LinearLayout>
 
         <!-- Open Decompiler button -->
         <Button
             android:id="@+id/button_open_decompiler"
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
-            android:text="@string/button_open_decompiler"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/label_project_name" />
+            android:text="@string/button_open_decompiler" />
 
-    </androidx.constraintlayout.widget.ConstraintLayout>
+    </LinearLayout>
 </ScrollView>

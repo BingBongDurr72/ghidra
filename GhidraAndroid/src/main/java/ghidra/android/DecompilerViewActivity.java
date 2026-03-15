@@ -16,6 +16,7 @@
 package ghidra.android;
 
 import android.annotation.SuppressLint;
+import android.app.Activity;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -30,8 +31,6 @@ import android.webkit.WebView;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Toast;
-
-import androidx.appcompat.app.AppCompatActivity;
 
 /**
  * Activity that shows Ghidra's decompiled output for a user-specified function
@@ -50,7 +49,7 @@ import androidx.appcompat.app.AppCompatActivity;
  * JavaScript is enabled only for the local HTML content injected by this
  * app; no remote URLs are loaded and file access is disabled.
  */
-public class DecompilerViewActivity extends AppCompatActivity {
+public class DecompilerViewActivity extends Activity {
 
     private static final String TAG = "DecompilerView";
 
