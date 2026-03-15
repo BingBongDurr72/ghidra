@@ -27,15 +27,17 @@
 
 # ---------------------------------------------------------------------------
 # AndroidX AppCompat – required for theme inheritance.
+# Uncomment if AndroidX is re-enabled (see build.gradle dependencies).
 # ---------------------------------------------------------------------------
--keep class androidx.appcompat.** { *; }
--dontwarn androidx.appcompat.**
+# -keep class androidx.appcompat.** { *; }
+# -dontwarn androidx.appcompat.**
 
 # ---------------------------------------------------------------------------
 # Material Components – required for button / text-appearance styles.
+# Uncomment if Material Components are re-enabled (see build.gradle).
 # ---------------------------------------------------------------------------
--keep class com.google.android.material.** { *; }
--dontwarn com.google.android.material.**
+# -keep class com.google.android.material.** { *; }
+# -dontwarn com.google.android.material.**
 
 # ---------------------------------------------------------------------------
 # WebView JavaScript interface (if added in future).

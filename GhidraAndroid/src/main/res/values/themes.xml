@@ -15,5 +15,6 @@
   * limitations under the License.
   -->
 <resources>
-    <style name="Theme.GhidraAndroid" parent="Theme.MaterialComponents.DayNight.DarkActionBar" />
+    <!-- Platform Material theme (API 21+), no external dependencies required. -->
+    <style name="Theme.GhidraAndroid" parent="@android:style/Theme.Material.Light.DarkActionBar" />
 </resources>

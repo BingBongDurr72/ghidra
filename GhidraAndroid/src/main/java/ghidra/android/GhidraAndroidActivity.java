@@ -27,10 +27,6 @@ import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.activity.result.ActivityResultLauncher;
-import androidx.activity.result.contract.ActivityResultContracts;
-import androidx.appcompat.app.AppCompatActivity;
-
 /**
  * Main entry-point Activity for Ghidra on Android (GhidraDroid).
  *
@@ -50,7 +46,7 @@ import androidx.appcompat.app.AppCompatActivity;
  * progress and results are delivered back via {@link BroadcastReceiver}
  * that this Activity registers while it is in the started state.
  */
-public class GhidraAndroidActivity extends AppCompatActivity {
+public class GhidraAndroidActivity extends Activity {
 
     /** Broadcast action sent by {@link GhidraAnalysisService} with progress updates. */
     public static final String ACTION_ANALYSIS_PROGRESS =
@@ -104,23 +100,9 @@ public class GhidraAndroidActivity extends AppCompatActivity {
     };
 
     // -----------------------------------------------------------------------
-    // File-picker launcher
+    // File-picker request code (for startActivityForResult)
     // -----------------------------------------------------------------------
-    private final ActivityResultLauncher<Intent> filePickerLauncher =
-            registerForActivityResult(
-                    new ActivityResultContracts.StartActivityForResult(),
-                    result -> {
-                        if (result.getResultCode() == Activity.RESULT_OK &&
-                                result.getData() != null) {
-                            selectedFileUri = result.getData().getData();
-                            if (selectedFileUri != null) {
-                                analyzeButton.setEnabled(true);
-                                String fileName = selectedFileUri.getLastPathSegment();
-                                statusTextView.setText(
-                                        getString(R.string.status_file_selected, fileName));
-                            }
-                        }
-                    });
+    private static final int FILE_PICKER_REQUEST = 1001;
 
     // -----------------------------------------------------------------------
     // Lifecycle
@@ -201,8 +183,26 @@ public class GhidraAndroidActivity extends AppCompatActivity {
         Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
         intent.setType("application/octet-stream");
         intent.addCategory(Intent.CATEGORY_OPENABLE);
-        filePickerLauncher.launch(Intent.createChooser(intent,
-                getString(R.string.chooser_title)));
+        startActivityForResult(Intent.createChooser(intent,
+                getString(R.string.chooser_title)), FILE_PICKER_REQUEST);
+    }
+
+    /**
+     * Receives the result from the file picker launched by {@link #openFilePicker()}.
+     */
+    @Override
+    @SuppressWarnings("deprecation")
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == FILE_PICKER_REQUEST && resultCode == RESULT_OK && data != null) {
+            selectedFileUri = data.getData();
+            if (selectedFileUri != null) {
+                analyzeButton.setEnabled(true);
+                String fileName = selectedFileUri.getLastPathSegment();
+                statusTextView.setText(
+                        getString(R.string.status_file_selected, fileName));
+            }
+        }
     }
 
     /**

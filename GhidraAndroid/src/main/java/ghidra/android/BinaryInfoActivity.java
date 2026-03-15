@@ -15,6 +15,7 @@
  */
 package ghidra.android;
 
+import android.app.Activity;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -26,8 +27,6 @@ import android.util.Log;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
-
-import androidx.appcompat.app.AppCompatActivity;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -47,7 +46,7 @@ import org.json.JSONObject;
  * <p>A "View Decompiled Code" button launches {@link DecompilerViewActivity}
  * so the user can navigate functions.
  */
-public class BinaryInfoActivity extends AppCompatActivity {
+public class BinaryInfoActivity extends Activity {
 
     private static final String TAG = "BinaryInfoActivity";
 

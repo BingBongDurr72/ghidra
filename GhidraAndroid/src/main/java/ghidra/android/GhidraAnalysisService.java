@@ -26,9 +26,6 @@ import android.os.IBinder;
 import android.os.RemoteException;
 import android.util.Log;
 
-import androidx.annotation.Nullable;
-import androidx.core.app.NotificationCompat;
-
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -307,12 +304,29 @@ public class GhidraAnalysisService extends Service {
         };
 
         /*
-         * GhidraLauncher.launch() discovers all modules on the classpath and
-         * then delegates to the AnalyzeHeadless entry point. On Android, the
-         * Ghidra JARs must be bundled inside the APK (see build.gradle) and
-         * placed on the class path before this call.
+         * Invoke GhidraLauncher.launch() via reflection so that this class
+         * compiles even when the Ghidra JARs are not on the build-time
+         * classpath.  At runtime, the JARs must be bundled in the APK
+         * (see build.gradle) for the call to succeed.
+         *
+         * Equivalent to: ghidra.GhidraLauncher.launch(args);
          */
-        ghidra.GhidraLauncher.launch(args);
+        try {
+            Class<?> launcherClass = Class.forName("ghidra.GhidraLauncher");
+            java.lang.reflect.Method launchMethod =
+                    launcherClass.getMethod("launch", String[].class);
+            launchMethod.invoke(null, (Object) args);
+        }
+        catch (ClassNotFoundException e) {
+            throw new RuntimeException(
+                "Ghidra JARs are not bundled in this APK build. "
+                + "Build Ghidra first (./gradlew buildGhidra) then rebuild the APK "
+                + "with the Ghidra distribution JARs on the classpath.", e);
+        }
+        catch (java.lang.reflect.InvocationTargetException e) {
+            Throwable cause = e.getCause();
+            throw (cause instanceof Exception) ? (Exception) cause : e;
+        }
 
         // Populate the binary info cache with a minimal JSON summary.
         binaryInfoJson.set(buildBinaryInfoJson(binaryFile, projectName));
@@ -527,7 +541,7 @@ public class GhidraAnalysisService extends Service {
     }
 
     private Notification buildNotification(String contentText) {
-        return new NotificationCompat.Builder(this, CHANNEL_ID)
+        return new Notification.Builder(this, CHANNEL_ID)
                 .setContentTitle(getString(R.string.app_name))
                 .setContentText(contentText)
                 .setSmallIcon(android.R.drawable.ic_menu_search)

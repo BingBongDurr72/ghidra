@@ -15,6 +15,8 @@
  */
 package ghidra.android;
 
+import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -32,9 +34,6 @@ import android.widget.ArrayAdapter;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
-
-import androidx.appcompat.app.AlertDialog;
-import androidx.appcompat.app.AppCompatActivity;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -56,7 +55,7 @@ import java.util.List;
  * <p>The project list is fetched from {@link GhidraAnalysisService} via the
  * {@link IGhidraAnalysisService} AIDL interface.
  */
-public class ProjectDashboardActivity extends AppCompatActivity {
+public class ProjectDashboardActivity extends Activity {
 
     private static final String TAG = "ProjectDashboard";
 
