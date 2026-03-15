@@ -20,6 +20,10 @@
     <!-- Buttons -->
     <string name="button_select_file">Select Binary File…</string>
     <string name="button_analyze">Analyze</string>
+    <string name="button_view_results">View Binary Info</string>
+    <string name="button_projects">Manage Projects</string>
+    <string name="button_open_decompiler">View Decompiled Code</string>
+    <string name="button_go">Go</string>
 
     <!-- File chooser -->
     <string name="chooser_title">Choose binary file to analyze</string>
@@ -30,14 +34,46 @@
     <string name="status_copying_file">Copying file to app storage…</string>
     <string name="status_analysis_started">Analysis started…</string>
     <string name="status_analysis_complete">Analysis complete.</string>
+    <string name="status_analysis_cancelled">Analysis cancelled.</string>
+    <string name="status_no_projects">No saved projects. Analyze a binary to create one.</string>
+    <string name="status_project_deleted">Project "%1$s" deleted.</string>
 
     <!-- Error messages -->
     <string name="error_no_file_selected">No file selected.</string>
     <string name="error_copy_failed">Failed to copy file: %1$s</string>
+    <!-- Used as a prefix check in GhidraAndroidActivity -->
+    <string name="error_analysis_failed_prefix">Analysis failed:</string>
     <string name="error_analysis_failed">Analysis failed: %1$s</string>
+    <string name="error_service_unavailable">Analysis service not available.</string>
+    <string name="error_no_binary_info">No binary information available yet.</string>
+    <string name="error_malformed_binary_info">Binary info could not be parsed.</string>
+    <string name="error_no_address">Please enter a function address.</string>
+    <string name="error_delete_failed">Failed to delete project.</string>
+
+    <!-- Binary info labels -->
+    <string name="label_file_name">File:</string>
+    <string name="label_file_size">Size:</string>
+    <string name="label_architecture">Architecture:</string>
+    <string name="label_endianness">Endianness:</string>
+    <string name="label_entry_point">Entry point:</string>
+    <string name="label_project_name">Project:</string>
+    <string name="value_unknown">—</string>
+
+    <!-- Decompiler view -->
+    <string name="hint_address">Function address (e.g. 0x00401000)</string>
+    <string name="decompiler_placeholder">Enter a function address above and tap Go.</string>
+    <string name="decompiler_no_result">/* No decompiled output available for %1$s */</string>
+
+    <!-- Project dashboard -->
+    <string name="dialog_delete_title">Delete project</string>
+    <string name="dialog_delete_message">Delete project "%1$s"? This cannot be undone.</string>
+    <string name="action_delete">Delete</string>
 
     <!-- Notification channel -->
     <string name="notif_channel_name">Ghidra Analysis</string>
     <string name="notif_channel_desc">Shows progress of ongoing binary analysis jobs</string>
     <string name="notif_analysis_running">Ghidra analysis running…</string>
+
+    <!-- Warnings -->
+    <string name="warning_low_memory">Warning: device is low on memory. Analysis may be slow.</string>
 </resources>
