@@ -101,6 +101,7 @@ public class GhidraAnalysisService extends Service {
     private static final long LOW_MEMORY_THRESHOLD_BYTES = 64L * 1024 * 1024;
     private static final String VALUE_NOT_AVAILABLE = "Not available";
     private static final String VALUE_NOT_APPLICABLE = "Not applicable";
+    private static final int DECOMPILE_TIMEOUT_SECONDS = 30;
     private static final Object GHIDRA_INIT_LOCK = new Object();
 
     // -----------------------------------------------------------------------
@@ -134,6 +135,9 @@ public class GhidraAnalysisService extends Service {
     /** Name of the most recently analyzed program file in the project. */
     private final AtomicReference<String> lastProgramName = new AtomicReference<>(null);
 
+    /** Folder path of the most recently analyzed program within the project. */
+    private final AtomicReference<String> lastProgramFolderPath = new AtomicReference<>("/");
+
     // -----------------------------------------------------------------------
     // AIDL binder
     // -----------------------------------------------------------------------
@@ -152,11 +156,14 @@ public class GhidraAnalysisService extends Service {
             }
             String projectName = lastProjectName.get();
             String programName = lastProgramName.get();
-            if (addressHex == null || projectName == null || programName == null) {
+            String programFolderPath = lastProgramFolderPath.get();
+            if (addressHex == null || projectName == null || programName == null ||
+                    programFolderPath == null) {
                 return null;
             }
             try {
-                String decompiled = decompileFunctionFromProject(projectName, programName, addressHex);
+                String decompiled = decompileFunctionFromProject(projectName, programFolderPath,
+                        programName, addressHex);
                 if (decompiled != null) {
                     lastDecompiledAddress.set(addressHex);
                     lastDecompiledOutput.set(decompiled);
@@ -263,6 +270,7 @@ public class GhidraAnalysisService extends Service {
         lastDecompiledAddress.set(null);
         lastProjectName.set(null);
         lastProgramName.set(null);
+        lastProgramFolderPath.set("/");
 
         broadcast(getString(R.string.status_copying_file));
 
@@ -343,8 +351,10 @@ public class GhidraAnalysisService extends Service {
             project.save(program);
 
             String programName = program.getDomainFile().getName();
+            String programFolderPath = program.getDomainFile().getParent().getPathname();
             lastProjectName.set(projectName);
             lastProgramName.set(programName);
+            lastProgramFolderPath.set(programFolderPath);
             binaryInfoJson.set(buildBinaryInfoJson(program, binaryFile, projectName));
 
             Address defaultEntryPoint = findPreferredEntryPoint(program);
@@ -519,7 +529,7 @@ public class GhidraAnalysisService extends Service {
     }
 
     private static String coalesce(String primary, String fallback) {
-        return (primary == null || primary.isBlank()) ? fallback : primary;
+        return (primary != null && !primary.isBlank()) ? primary : fallback;
     }
 
     private void ensureGhidraInitialized() throws IOException {
@@ -546,14 +556,14 @@ public class GhidraAnalysisService extends Service {
         return program.getImageBase();
     }
 
-    private String decompileFunctionFromProject(String projectName, String programName, String addressHex)
-            throws Exception {
+    private String decompileFunctionFromProject(String projectName, String programFolderPath,
+            String programName, String addressHex) throws Exception {
         ensureGhidraInitialized();
         GhidraProject project = null;
         Program program = null;
         try {
             project = GhidraProject.openProject(getProjectsDir().getAbsolutePath(), projectName);
-            program = project.openProgram("/", programName, true);
+            program = project.openProgram(programFolderPath, programName, true);
             return decompileProgramFunction(program, addressHex);
         }
         finally {
@@ -591,7 +601,8 @@ public class GhidraAnalysisService extends Service {
                 return null;
             }
 
-            DecompileResults results = decompiler.decompileFunction(function, 30, TaskMonitor.DUMMY);
+            DecompileResults results = decompiler.decompileFunction(function,
+                    DECOMPILE_TIMEOUT_SECONDS, TaskMonitor.DUMMY);
             if (!results.decompileCompleted()) {
                 Log.w(TAG, "Decompiler did not complete: " + results.getErrorMessage());
                 return null;
@@ -786,6 +797,9 @@ public class GhidraAnalysisService extends Service {
         if (magic.length < 4) {
             return false;
         }
+        // Accept the three common ZIP local/end-of-central-directory signatures:
+        // PK\003\004 (normal archive), PK\005\006 (empty archive),
+        // and PK\007\008 (spanned archive).
         return magic[0] == 'P' && magic[1] == 'K' &&
                 (magic[2] == 3 || magic[2] == 5 || magic[2] == 7) &&
                 (magic[3] == 4 || magic[3] == 6 || magic[3] == 8);
