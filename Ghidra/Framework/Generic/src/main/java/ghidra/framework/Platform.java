@@ -81,6 +81,21 @@ public enum Platform {
 	FREEBSD_ARM_64(OperatingSystem.FREE_BSD, Architecture.ARM_64, "freebsd_arm_64", ".so", ""),
 
 	/**
+	 * Identifies an Android ARM 64-bit OS (most modern Android devices).
+	 */
+	ANDROID_ARM_64(OperatingSystem.ANDROID, Architecture.ARM_64, "android_arm_64", ".so", ""),
+
+	/**
+	 * Identifies an Android x86 64-bit OS (Android emulators and some devices).
+	 */
+	ANDROID_X86_64(OperatingSystem.ANDROID, Architecture.X86_64, "android_x86_64", ".so", ""),
+
+	/**
+	 * Identifies an Android x86 32-bit OS.
+	 */
+	ANDROID_X86_32(OperatingSystem.ANDROID, Architecture.X86, "android_x86_32", ".so", ""),
+
+	/**
 	 * Identifies an unsupported OS.
 	 */
 	UNSUPPORTED(OperatingSystem.UNSUPPORTED, Architecture.UNKNOWN, null, null, ""),
@@ -225,6 +240,12 @@ public enum Platform {
 			paths.add("/usr/lib");
 			paths.add("/usr/X11R6/bin");
 			paths.add("/usr/X11R6/lib");
+		}
+		else if (operatingSystem == OperatingSystem.ANDROID) {
+			paths.add("/system/lib");
+			paths.add("/system/lib64");
+			paths.add("/vendor/lib");
+			paths.add("/vendor/lib64");
 		}
 		else if (operatingSystem == OperatingSystem.MAC_OS_X) {
 			paths.add("/System/Library/dyld/dyld_shared_cache_arm64e");

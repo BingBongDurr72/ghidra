@@ -47,6 +47,12 @@ includeProjects('GhidraBuild/EclipsePlugins/GhidraDev') // requires Eclipse PDE
 includeProjects('GhidraBuild/EclipsePlugins/GhidraSleighEditor') // requires Eclipse DSL
 
 /*******************************************************************************************
+ * Android application module – wraps Ghidra's headless analysis engine in an Android app.
+ * Requires the Android SDK and Android Gradle Plugin (AGP) 8.x.
+ *******************************************************************************************/
+includeProject('GhidraAndroid', '.', true)
+
+/*******************************************************************************************
  * Apply additional Ghidra respositories
  *******************************************************************************************/
 File extensionsList = file("ghidra.repos.config")
