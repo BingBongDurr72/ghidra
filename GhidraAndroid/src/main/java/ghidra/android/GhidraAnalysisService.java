@@ -342,39 +342,51 @@ public class GhidraAnalysisService extends Service {
         // Ghidra project directory lives inside the app's private files area.
         File projectDir = getProjectsDir();
         String projectName = sanitizeProjectName(binaryFile.getName());
-        GhidraProject project = null;
-        Program program = null;
+
+        /*
+         * Build the argument list that mirrors the analyzeHeadless command:
+         *
+         *   analyzeHeadless <projectDir> <projectName> \
+         *       -import <binaryFile>
+         *
+         * We do NOT pass -deleteproject so that subsequent queries (e.g.
+         * decompile a specific function) can reuse the saved project.
+         */
+        String[] args = {
+            "ghidra.app.util.headless.AnalyzeHeadless",
+            projectDir.getAbsolutePath(),
+            projectName,
+            "-import",
+            binaryFile.getAbsolutePath()
+        };
+
+        /*
+         * Invoke GhidraLauncher.launch() via reflection so that this class
+         * compiles even when the Ghidra JARs are not on the build-time
+         * classpath.  At runtime, the JARs must be bundled in the APK
+         * (see build.gradle) for the call to succeed.
+         *
+         * Equivalent to: ghidra.GhidraLauncher.launch(args);
+         */
         try {
-            project = GhidraProject.createProject(projectDir.getAbsolutePath(), projectName, false);
-            program = project.importProgram(binaryFile);
-            GhidraProject.analyze(program);
-            project.save(program);
-
-            String programName = program.getDomainFile().getName();
-            String programFolderPath = program.getDomainFile().getParent().getPathname();
-            lastProjectName.set(projectName);
-            lastProgramName.set(programName);
-            lastProgramFolderPath.set(programFolderPath);
-            binaryInfoJson.set(buildBinaryInfoJson(program, binaryFile, projectName));
-
-            Address defaultEntryPoint = findPreferredEntryPoint(program);
-            if (defaultEntryPoint != null) {
-                String addressHex = defaultEntryPoint.toString();
-                String decompiled = decompileProgramFunction(program, addressHex);
-                if (decompiled != null) {
-                    lastDecompiledAddress.set(addressHex);
-                    lastDecompiledOutput.set(decompiled);
-                }
-            }
+            Class<?> launcherClass = Class.forName("ghidra.GhidraLauncher");
+            java.lang.reflect.Method launchMethod =
+                    launcherClass.getMethod("launch", String[].class);
+            launchMethod.invoke(null, (Object) args);
         }
-        finally {
-            if (project != null && program != null) {
-                project.close(program);
-            }
-            if (project != null) {
-                project.close();
-            }
+        catch (ClassNotFoundException e) {
+            throw new RuntimeException(
+                "Ghidra JARs are not bundled in this APK build. "
+                + "Build Ghidra first (./gradlew buildGhidra) then rebuild the APK "
+                + "with the Ghidra distribution JARs on the classpath.", e);
         }
+        catch (java.lang.reflect.InvocationTargetException e) {
+            Throwable cause = e.getCause();
+            throw (cause instanceof Exception) ? (Exception) cause : e;
+        }
+
+        // Populate the binary info cache with a minimal JSON summary.
+        binaryInfoJson.set(buildBinaryInfoJson(binaryFile, projectName));
     }
 
     // -----------------------------------------------------------------------

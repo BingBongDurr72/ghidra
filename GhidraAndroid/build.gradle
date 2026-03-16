@@ -28,29 +28,27 @@
  *   - ProjectDashboardActivity – lists / deletes saved Ghidra projects.
  *   - BinaryInfoActivity     – displays binary metadata after analysis.
  *   - DecompilerViewActivity – renders decompiled C code in a WebView.
- *   - libdecompiler.so       – native Ghidra decompiler (C++, NDK-built).
+ *   - libdecompiler.so       – native Ghidra decompiler (C++, NDK-built, optional).
  *
  * Prerequisites:
  *   - Android SDK installed and ANDROID_HOME / ANDROID_SDK_ROOT set
- *   - Android Gradle Plugin (AGP) 8.x
- *   - Android NDK r25+ (for the native decompiler build)
- *   - Local flat-repo dependencies available (bootstrapped automatically)
+ *   - Android Gradle Plugin (AGP) 8.2.x
+ *   - Ghidra core libraries available (build the main project first, optional)
  *
- * Build:
- *   ./gradlew :GhidraAndroid:assembleDebug
+ * Standalone build (from the GhidraAndroid/ directory):
+ *   ./gradlew assembleDebug
+ *
+ * Build from the repository root:
+ *   GhidraAndroid/gradlew -p GhidraAndroid assembleDebug
+ *
+ * Native decompiler build (optional):
+ *   Set the gradle property 'buildNativeDecompiler=true' and ensure NDK r25+ is installed.
+ *   The NDK build is disabled by default to allow the APK to be produced without NDK.
  */
 
-buildscript {
-    repositories {
-        google()
-        mavenCentral()
-    }
-    dependencies {
-        classpath 'com.android.tools.build:gradle:8.2.0'
-    }
+plugins {
+    id 'com.android.application' version '8.2.0'
 }
-
-apply plugin: 'com.android.application'
 
 android {
     namespace 'ghidra.android'
@@ -65,15 +63,19 @@ android {
 
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
 
-        // Native build: compile the Ghidra decompiler for arm64 and arm32.
-        externalNativeBuild {
-            cmake {
-                cppFlags '-std=c++11'
-                arguments '-DANDROID_STL=c++_shared'
+        // Native build for the Ghidra decompiler (C++) is optional.
+        // Enable by setting the Gradle property 'buildNativeDecompiler=true'.
+        // The NDK and Android CMake must be installed.
+        if (project.findProperty('buildNativeDecompiler') == 'true') {
+            externalNativeBuild {
+                cmake {
+                    cppFlags '-std=c++11'
+                    arguments '-DANDROID_STL=c++_shared'
+                }
             }
-        }
-        ndk {
-            abiFilters 'arm64-v8a', 'armeabi-v7a'
+            ndk {
+                abiFilters 'arm64-v8a', 'armeabi-v7a'
+            }
         }
     }
 
@@ -93,10 +95,13 @@ android {
     }
 
     // Wire up CMakeLists.txt for the native decompiler library.
-    externalNativeBuild {
-        cmake {
-            path 'src/main/cpp/CMakeLists.txt'
-            version '3.22.1'
+    // Only enabled when buildNativeDecompiler=true is passed to Gradle.
+    if (project.findProperty('buildNativeDecompiler') == 'true') {
+        externalNativeBuild {
+            cmake {
+                path 'src/main/cpp/CMakeLists.txt'
+                version '3.22.1'
+            }
         }
     }
 
