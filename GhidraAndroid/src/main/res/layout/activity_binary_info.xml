@@ -66,6 +66,27 @@
             app:layout_constraintStart_toEndOf="@id/label_file_size"
             app:layout_constraintTop_toTopOf="@id/label_file_size" />
 
+        <!-- Format -->
+        <TextView
+            android:id="@+id/label_format"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/label_format"
+            android:textStyle="bold"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/label_file_size" />
+
+        <TextView
+            android:id="@+id/text_format"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:text="@string/value_unknown"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toEndOf="@id/label_format"
+            app:layout_constraintTop_toTopOf="@id/label_format" />
+
         <!-- Architecture -->
         <TextView
             android:id="@+id/label_architecture"
@@ -75,7 +96,7 @@
             android:text="@string/label_architecture"
             android:textStyle="bold"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/label_file_size" />
+            app:layout_constraintTop_toBottomOf="@id/label_format" />
 
         <TextView
             android:id="@+id/text_architecture"

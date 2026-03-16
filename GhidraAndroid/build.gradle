@@ -124,6 +124,8 @@ repositories {
     mavenCentral()
 }
 
+def processorRoot = rootProject.file('Ghidra/Processors').absolutePath
+
 dependencies {
     // Android desugaring support (required for Java 17 APIs on older runtimes)
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'
@@ -133,18 +135,16 @@ dependencies {
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
     implementation 'com.google.android.material:material:1.11.0'
 
-    // Ghidra utility / framework JARs (produced by the main Ghidra build).
-    // Adjust the path below if your Ghidra build output is in a different location.
-    def ghidraBuildDir = rootProject.file("build/dist")
-    if (ghidraBuildDir.exists()) {
-        implementation fileTree(dir: ghidraBuildDir, include: ['**/*.jar'],
-            exclude: [
-                // Exclude Swing-only JARs that cannot run on Android
-                '**/docking*.jar',
-                '**/Gui*.jar',
-                '**/Help*.jar',
-                '**/Graph*.jar'
-            ])
+    // Core Ghidra modules required for headless import, analysis, and decompilation.
+    implementation project(':Base')
+    implementation project(':Decompiler')
+    implementation project(':FileFormats')
+
+    // Processor modules provide language definitions used during binary import.
+    rootProject.subprojects.findAll {
+        it.projectDir.absolutePath.startsWith(processorRoot)
+    }.sort { it.path }.each { processorProject ->
+        implementation processorProject
     }
 
     // Testing
