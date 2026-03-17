@@ -16,7 +16,7 @@
 package ghidra.app.util.bin.format.dwarf;
 
 import static ghidra.app.util.bin.format.dwarf.DWARFTag.*;
-import static ghidra.app.util.bin.format.dwarf.attribs.DWARFAttribute.*;
+import static ghidra.app.util.bin.format.dwarf.attribs.DWARFAttributeId.*;
 
 import java.io.IOException;
 import java.util.*;
@@ -24,6 +24,7 @@ import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
 import ghidra.app.cmd.label.SetLabelPrimaryCmd;
+import ghidra.app.util.bin.format.dwarf.expression.DWARFExpressionEvaluator;
 import ghidra.app.util.bin.format.dwarf.expression.DWARFExpressionException;
 import ghidra.app.util.bin.format.dwarf.funcfixup.DWARFFunctionFixup;
 import ghidra.program.database.function.OverlappingFunctionException;
@@ -46,8 +47,9 @@ public class DWARFFunction {
 	public Namespace namespace;
 	private DWARFRangeList dwarfBody;
 	public Address address;
-	public long frameBase;	// TODO: change this to preserve the func's frameBase expr instead of value
 	public Function function;	// ghidra function
+
+	public DWARFLocation funcEntryFrameBaseLoc;
 
 	public String callingConventionName;
 
@@ -70,10 +72,8 @@ public class DWARFFunction {
 	 * @param diea DW_TAG_subprogram {@link DIEAggregate}
 	 * @return new {@link DWARFFunction}, or null if invalid DWARF information 
 	 * @throws IOException if error accessing attribute values
-	 * @throws DWARFExpressionException if error accessing attribute values
 	 */
-	public static DWARFFunction read(DIEAggregate diea)
-			throws IOException, DWARFExpressionException {
+	public static DWARFFunction read(DIEAggregate diea) throws IOException {
 		if (diea.isDanglingDeclaration()) {
 			return null;
 		}
@@ -100,7 +100,21 @@ public class DWARFFunction {
 			DWARFLocation frameLoc = frameBaseLocs.getLocationContaining(dfunc.getEntryPc());
 			// get the framebase register, find where the frame is finally setup.
 			if (frameLoc != null) {
-				dfunc.frameBase = frameLoc.evaluate(diea.getCompilationUnit()).pop();
+				try {
+					DWARFExpressionEvaluator evaluator =
+						new DWARFExpressionEvaluator(diea.getCompilationUnit());
+					if (prog.getImportOptions().isUseStaticStackFrameRegisterValue()) {
+						evaluator.setValReader(evaluator.withStaticStackRegisterValues(null,
+							prog.getRegisterMappings().getStackFrameRegisterOffset()));
+					}
+					evaluator.evaluate(frameLoc.getExpr());
+					frameLoc.setResolvedValue(evaluator.popVarnode());
+					dfunc.funcEntryFrameBaseLoc = frameLoc;
+				}
+				catch (DWARFExpressionException e) {
+					// ignore, any location expressions that use DW_OP_fbreg will fail
+					prog.getImportSummary().addProblematicDWARFExpression(e.getExpression());
+				}
 			}
 		}
 
@@ -313,7 +327,7 @@ public class DWARFFunction {
 			VariableUtilities.checkVariableConflict(function, var, varStorage, true);
 			function.addLocalVariable(var, SourceType.IMPORTED);
 		}
-		catch (InvalidInputException | DuplicateNameException e) {
+		catch (InvalidInputException | DuplicateNameException | IllegalArgumentException e) {
 			getProgram()
 					.logWarningAt(function.getEntryPoint().add(dvar.lexicalOffset),
 						function.getName(),
@@ -352,6 +366,14 @@ public class DWARFFunction {
 	public boolean syncWithExistingGhidraFunction(boolean createIfMissing) {
 		try {
 			Program currentProgram = getProgram().getGhidraProgram();
+			if (!currentProgram.getMemory().getExecuteSet().contains(address)) {
+				// NOTE: if func's DIE specifies a lowpc == 0, the calculated address will be
+				// the program's imagebase.  This typically can only be valid in .o files.
+				// If this binary is not a .o, and doesn't have executable segment at '0'
+				// (or where ever the binary was imported at), then the addr = 0 is probably
+				// just bad data that the toolchain put into the dwarf info.
+				return false; // dwarf function address info is probably bogus   
+			}
 			function = currentProgram.getListing().getFunctionAt(address);
 			if (function != null) {
 				if (function.hasNoReturn() && !noReturn) {
@@ -457,7 +479,7 @@ public class DWARFFunction {
 			function.setVarArgs(varArg);
 			function.setNoReturn(noReturn);
 		}
-		catch (InvalidInputException | DuplicateNameException e) {
+		catch (InvalidInputException | IllegalArgumentException | DuplicateNameException e) {
 			Msg.error(this, "Error updating function %s@%s with params: %s".formatted(
 				function.getName(), function.getEntryPoint().toString(), e.getMessage()));
 			Msg.error(this, "DIE info: " + diea.toString());

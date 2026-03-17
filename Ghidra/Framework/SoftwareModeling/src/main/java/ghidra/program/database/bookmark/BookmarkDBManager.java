@@ -4,9 +4,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -52,6 +52,7 @@ public class BookmarkDBManager implements BookmarkManager, ErrorHandler, Manager
 	private boolean upgrade = false;
 
 	private Map<String, BookmarkType> typesByName = new TreeMap<>();
+	private Set<String> definedTypes = new HashSet<>();
 	private ObjectArray typesArray = new ObjectArray();
 	private Lock lock;
 
@@ -102,7 +103,7 @@ public class BookmarkDBManager implements BookmarkManager, ErrorHandler, Manager
 				int typeId = (int) rec.getKey();
 				BookmarkTypeDB type =
 					new BookmarkTypeDB(typeId, rec.getString(BookmarkTypeDBAdapter.TYPE_NAME_COL));
-				type.setHasBookmarks(true);
+				type.setHasBookmarks(bookmarkAdapter.hasTable(typeId));
 				typesByName.put(type.getTypeString(), type);
 				typesArray.put(typeId, type);
 			}
@@ -207,9 +208,11 @@ public class BookmarkDBManager implements BookmarkManager, ErrorHandler, Manager
 			typesArray.put(typeId, bmt);
 		}
 		if (create && !bmt.hasBookmarks()) {
+
+			// Ensure that both type record and bookmarks table exists
 			bookmarkTypeAdapter.addType(bmt.getTypeId(), bmt.getTypeString());
-			bmt.setHasBookmarks(true);
 			bookmarkAdapter.addType(bmt.getTypeId());
+			bmt.setHasBookmarks(true);
 
 			// fire event
 			program.setObjChanged(ProgramEvent.BOOKMARK_TYPE_ADDED, bmt, null, null);
@@ -236,6 +239,11 @@ public class BookmarkDBManager implements BookmarkManager, ErrorHandler, Manager
 	}
 
 	@Override
+	public boolean isDefinedType(String type) {
+		return definedTypes.contains(type);
+	}
+
+	@Override
 	public BookmarkType defineType(String type, Icon icon, Color color, int priority) {
 		lock.acquire();
 		try {
@@ -251,6 +259,7 @@ public class BookmarkDBManager implements BookmarkManager, ErrorHandler, Manager
 				bmt.setIcon(icon);
 				bmt.setMarkerColor(color);
 				bmt.setMarkerPriority(priority);
+				definedTypes.add(type);
 			}
 			catch (IOException e) {
 				dbError(e);

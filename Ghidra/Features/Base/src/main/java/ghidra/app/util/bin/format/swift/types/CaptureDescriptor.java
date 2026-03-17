@@ -4,9 +4,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -21,13 +21,14 @@ import java.util.List;
 
 import ghidra.app.util.bin.BinaryReader;
 import ghidra.app.util.bin.format.swift.SwiftTypeMetadataStructure;
-import ghidra.program.model.data.*;
+import ghidra.program.model.data.DataType;
+import ghidra.program.model.data.StructureDataType;
 import ghidra.util.exception.DuplicateNameException;
 
 /**
- * Represents a Swift CaptureDescriptor structure
+ * Represents a Swift {@code CaptureDescriptor} structure
  * 
- * @see <a href="https://github.com/apple/swift/blob/main/include/swift/RemoteInspection/Records.h">swift/RemoteInspection/Records.h</a> 
+ * @see <a href="https://github.com/swiftlang/swift/blob/main/include/swift/RemoteInspection/Records.h">swift/RemoteInspection/Records.h</a> 
  */
 public final class CaptureDescriptor extends SwiftTypeMetadataStructure {
 
@@ -65,45 +66,35 @@ public final class CaptureDescriptor extends SwiftTypeMetadataStructure {
 	}
 
 	/**
-	 * Gets the number of capture types
-	 * 
-	 * @return The number of capture types
+	 * {@return the number of capture types}
 	 */
 	public int getNumCaptureTypes() {
 		return numCaptureTypes;
 	}
 
 	/**
-	 * Gets the number of metadata sources
-	 * 
-	 * @return The number of metadata sources
+	 * {@return the number of metadata sources}
 	 */
 	public int getNumMetadataSources() {
 		return numMetadataSources;
 	}
 
 	/**
-	 * Gets the number of bindings
-	 * 
-	 * @return The number of bindings
+	 * {@return the number of bindings}
 	 */
 	public int getNumBindings() {
 		return numBindings;
 	}
 
 	/**
-	 * Gets the {@link List} of {@link CaptureTypeRecord}s
-	 * 
-	 * @return The {@link List} of {@link CaptureTypeRecord}s
+	 * {@return the {@link List} of {@link CaptureTypeRecord}s}
 	 */
 	public List<CaptureTypeRecord> getCaptureTypeRecords() {
 		return captureTypeRecords;
 	}
 
 	/**
-	 * Gets the {@link List} of {@link MetadataSourceRecord}s
-	 * 
-	 * @return The {@link List} of {@link MetadataSourceRecord}s
+	 * {@return the {@link List} of {@link MetadataSourceRecord}s}
 	 */
 	public List<MetadataSourceRecord> getMetadataSourceRecords() {
 		return metadataSourceRecords;
@@ -121,11 +112,10 @@ public final class CaptureDescriptor extends SwiftTypeMetadataStructure {
 
 	@Override
 	public DataType toDataType() throws DuplicateNameException, IOException {
-		StructureDataType struct = new StructureDataType(getStructureName(), 0);
+		StructureDataType struct = new StructureDataType(CATEGORY_PATH, getStructureName(), 0);
 		struct.add(DWORD, "NumCaptureTypes", "");
 		struct.add(DWORD, "NumMetadataSources", "");
 		struct.add(DWORD, "NumBindings", "");
-		struct.setCategoryPath(new CategoryPath(DATA_TYPE_CATEGORY));
 		return struct;
 	}
 

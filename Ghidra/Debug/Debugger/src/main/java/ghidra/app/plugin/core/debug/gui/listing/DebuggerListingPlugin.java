@@ -21,7 +21,7 @@ import java.util.List;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
-import org.jdom.Element;
+import org.jdom2.Element;
 
 import docking.ActionContext;
 import docking.action.MenuData;
@@ -32,7 +32,8 @@ import ghidra.app.plugin.core.codebrowser.CodeViewerProvider;
 import ghidra.app.plugin.core.debug.DebuggerPluginPackage;
 import ghidra.app.plugin.core.debug.event.*;
 import ghidra.app.plugin.core.debug.gui.DebuggerResources.AbstractNewListingAction;
-import ghidra.app.plugin.core.debug.gui.action.*;
+import ghidra.app.plugin.core.debug.gui.action.DebuggerProgramLocationActionContext;
+import ghidra.app.plugin.core.debug.gui.action.NoneLocationTrackingSpec;
 import ghidra.app.services.*;
 import ghidra.app.util.viewer.format.FormatManager;
 import ghidra.app.util.viewer.listingpanel.ListingPanel;
@@ -196,7 +197,7 @@ public class DebuggerListingPlugin extends AbstractCodeBrowserPlugin<DebuggerLis
 	}
 
 	@Override
-	public void locationChanged(CodeViewerProvider provider, ProgramLocation location) {
+	public void broadcastLocationChanged(CodeViewerProvider provider, ProgramLocation location) {
 		// TODO: Fix cursor?
 		// Do not fire ProgramLocationPluginEvent.
 		if (provider == connectedProvider) {
@@ -205,7 +206,7 @@ public class DebuggerListingPlugin extends AbstractCodeBrowserPlugin<DebuggerLis
 	}
 
 	@Override
-	public void selectionChanged(CodeViewerProvider provider, ProgramSelection selection) {
+	public void broadcastSelectionChanged(CodeViewerProvider provider, ProgramSelection selection) {
 		if (provider != connectedProvider) {
 			return;
 		}
@@ -218,7 +219,7 @@ public class DebuggerListingPlugin extends AbstractCodeBrowserPlugin<DebuggerLis
 	}
 
 	@Override
-	public void highlightChanged(CodeViewerProvider provider, ProgramSelection highlight) {
+	public void broadcastHighlightChanged(CodeViewerProvider provider, ProgramSelection highlight) {
 		if (provider != connectedProvider) {
 			return;
 		}
@@ -450,6 +451,7 @@ public class DebuggerListingPlugin extends AbstractCodeBrowserPlugin<DebuggerLis
 
 	@Override
 	public void writeConfigState(SaveState saveState) {
+		super.writeConfigState(saveState);
 		SaveState connectedProviderState = new SaveState();
 		connectedProvider.writeConfigState(connectedProviderState);
 		saveState.putXmlElement(KEY_CONNECTED_PROVIDER, connectedProviderState.saveToXml());
@@ -470,6 +472,7 @@ public class DebuggerListingPlugin extends AbstractCodeBrowserPlugin<DebuggerLis
 
 	@Override
 	public void readConfigState(SaveState saveState) {
+		super.readConfigState(saveState);
 		Element connectedProviderElement = saveState.getXmlElement(KEY_CONNECTED_PROVIDER);
 		if (connectedProviderElement != null) {
 			SaveState connectedProviderState = new SaveState(connectedProviderElement);

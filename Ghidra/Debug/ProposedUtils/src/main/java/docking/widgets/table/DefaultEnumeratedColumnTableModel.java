@@ -4,9 +4,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -17,6 +17,8 @@ package docking.widgets.table;
 
 import java.util.*;
 import java.util.function.Predicate;
+
+import javax.swing.table.TableCellEditor;
 
 import docking.widgets.table.ColumnSortState.SortDirection;
 import docking.widgets.table.DefaultEnumeratedColumnTableModel.EnumeratedTableColumn;
@@ -119,7 +121,15 @@ public class DefaultEnumeratedColumnTableModel<C extends Enum<C> & EnumeratedTab
 		}
 
 		default public int getPreferredWidth() {
-			return -1;
+			return AbstractGTableModel.WIDTH_UNDEFINED;
+		}
+
+		default public int getMinWidth() {
+			return AbstractGTableModel.WIDTH_UNDEFINED;
+		}
+
+		default public int getMaxWidth() {
+			return AbstractGTableModel.WIDTH_UNDEFINED;
 		}
 
 		/**
@@ -131,6 +141,10 @@ public class DefaultEnumeratedColumnTableModel<C extends Enum<C> & EnumeratedTab
 		 * @return the renderer
 		 */
 		default public GColumnRenderer<?> getRenderer() {
+			return null;
+		}
+
+		default public TableCellEditor getEditor() {
 			return null;
 		}
 
@@ -159,6 +173,12 @@ public class DefaultEnumeratedColumnTableModel<C extends Enum<C> & EnumeratedTab
 	@Override
 	public List<R> getModelData() {
 		return modelData;
+	}
+
+	public List<R> copyModelData() {
+		synchronized (modelData) {
+			return List.copyOf(modelData);
+		}
 	}
 
 	static class EnumeratedDynamicTableColumn<R>
@@ -206,8 +226,23 @@ public class DefaultEnumeratedColumnTableModel<C extends Enum<C> & EnumeratedTab
 		}
 
 		@Override
+		public TableCellEditor getColumnEditor() {
+			return col.getEditor();
+		}
+
+		@Override
 		public int getColumnPreferredWidth() {
 			return col.getPreferredWidth();
+		}
+
+		@Override
+		public int getColumnMaxWidth() {
+			return col.getMaxWidth();
+		}
+
+		@Override
+		public int getColumnMinWidth() {
+			return col.getMinWidth();
 		}
 
 		@Override

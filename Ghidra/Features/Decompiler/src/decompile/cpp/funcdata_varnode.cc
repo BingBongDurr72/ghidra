@@ -536,6 +536,22 @@ void Funcdata::adjustInputVarnodes(const Address &addr,int4 sz)
   }
 }
 
+/// If the Varnode has descendants or is address forced, this method does nothing.
+/// Otherwise, the Varnode is destroyed as is its defining PcodeOp.  Any dead inputs to the PcodeOp are
+/// then destroyed recursively.
+/// \param vn is the Varnode to destroy
+void Funcdata::destroyVarnodeRecursive(Varnode *vn)
+
+{
+  if (vn->isAutoLive() || !vn->hasNoDescend()) return;
+  if (!vn->isWritten()) {
+    vbank.destroy(vn);
+    return;
+  }
+  vector<PcodeOp *> scratch;
+  opDestroyRecursive(vn->getDef(), scratch);
+}
+
 /// All p-code ops that read the Varnode are transformed so that they read
 /// a special constant instead (associate with unreachable block removal).
 /// \param vn is the given Varnode
@@ -610,11 +626,17 @@ void Funcdata::setHighLevel(void)
 /// Properties like boolean flags and \e consume bits are copied as appropriate.
 /// \param vn is the existing Varnode
 /// \param newVn is the new Varnode that has its properties set
-/// \param lsbOffset is the significance offset of the new Varnode within the exising
+/// \param lsbOffset is the significance offset of the new Varnode within the existing Varnode
 void Funcdata::transferVarnodeProperties(Varnode *vn,Varnode *newVn,int4 lsbOffset)
 
 {
-  uintb newConsume = (vn->getConsume() >> 8*lsbOffset) & calc_mask(newVn->getSize());
+  uintb newConsume = ~((uintb)0);	// Make sure any bits shifted in above the precision of Varnode::consume are set
+  if (lsbOffset < sizeof(uintb)) {
+    uintb fillBits = 0;
+    if (lsbOffset != 0)
+      fillBits = newConsume << 8*(sizeof(uintb) - lsbOffset);
+    newConsume = ((vn->getConsume() >> 8*lsbOffset) | fillBits) & calc_mask(newVn->getSize());
+  }
 
   uint4 vnFlags = vn->getFlags() & (Varnode::directwrite|Varnode::addrforce);
 
@@ -882,6 +904,9 @@ void Funcdata::calcNZMask(void)
       if (!vn->isWritten()) {
 	if (vn->isConstant())
 	  vn->nzm = vn->getOffset();
+	else if (vn->isTypeLock() && vn->getType()->getMetatype() == TYPE_BOOL) {
+	  vn->nzm = 1;
+	}
 	else {
 	  vn->nzm = calc_mask(vn->getSize());
 	  if (vn->isSpacebase())

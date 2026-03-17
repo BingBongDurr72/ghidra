@@ -16,6 +16,7 @@
 package ghidra.program.database.data;
 
 import java.io.IOException;
+import java.util.ConcurrentModificationException;
 import java.util.Objects;
 
 import db.DBRecord;
@@ -24,11 +25,12 @@ import ghidra.docking.settings.SettingsImpl;
 import ghidra.program.database.DBObjectCache;
 import ghidra.program.model.data.*;
 import ghidra.program.model.mem.MemBuffer;
+import ghidra.util.Msg;
 import ghidra.util.UniversalID;
 import ghidra.util.exception.AssertException;
 
 /**
- * Database implementation for a structure or union.
+ * {@link CompositeDB} provides an abstract database implementation for a structure or union.
  */
 abstract class CompositeDB extends DataTypeDB implements CompositeInternal {
 
@@ -311,33 +313,13 @@ abstract class CompositeDB extends DataTypeDB implements CompositeInternal {
 		}
 	}
 
-	/**
-	 * This method throws an exception if the indicated data type is an ancestor of
-	 * this data type. In other words, the specified data type has a component or
-	 * sub-component containing this data type.
-	 * 
-	 * @param dataType the data type
-	 * @throws DataTypeDependencyException if the data type is an ancestor of this
-	 *                                     data type.
-	 */
-	protected void checkAncestry(DataType dataType) throws DataTypeDependencyException {
-		if (this.equals(dataType)) {
-			throw new DataTypeDependencyException(
-				"Data type " + getDisplayName() + " can't contain itself.");
-		}
-		else if (DataTypeUtilities.isSecondPartOfFirst(dataType, this)) {
-			throw new DataTypeDependencyException("Data type " + dataType.getDisplayName() +
-				" has " + getDisplayName() + " within it.");
-		}
-	}
-
 	protected DataType doCheckedResolve(DataType dt) throws DataTypeDependencyException {
 		if (dt instanceof Pointer) {
 			pointerPostResolveRequired = true;
 			return resolve(((Pointer) dt).newPointer(DataType.DEFAULT));
 		}
 		dt = resolve(dt);
-		checkAncestry(dt);
+		DataTypeUtilities.checkAncestry(this, dt);
 		return dt;
 	}
 
@@ -697,7 +679,13 @@ abstract class CompositeDB extends DataTypeDB implements CompositeInternal {
 		DataTypeComponent[] definedComponents = composite.getDefinedComponents();
 		DataTypeComponentDB[] myDefinedComponents = getDefinedComponents();
 		if (definedComponents.length != myDefinedComponents.length) {
-			throw new IllegalArgumentException("mismatched definition datatype");
+			Msg.error(this,
+				"Resolve failure: unexpected component count detected\nDefinition Type:\n" +
+					definitionDt.toString() + "\nResolving Type:\n" + this.toString());
+			throw new ConcurrentModificationException(
+				"Resolve failure: unexpected component count detected for '" +
+					definitionDt.getPathName() + "' (" + definedComponents.length + " vs " +
+					myDefinedComponents.length + ")");
 		}
 		for (int i = 0; i < definedComponents.length; i++) {
 			DataTypeComponent dtc = definedComponents[i];

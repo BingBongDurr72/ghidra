@@ -20,7 +20,6 @@ import ghidra.docking.settings.SettingsDefinition;
 import ghidra.program.database.data.DataTypeUtilities;
 import ghidra.program.model.mem.MemBuffer;
 import ghidra.util.InvalidNameException;
-import ghidra.util.exception.DuplicateNameException;
 
 /**
  * Basic implementation of the Array interface.
@@ -279,10 +278,11 @@ public class ArrayDataType extends DataTypeImpl implements Array {
 
 	@Override
 	public void dataTypeReplaced(DataType oldDt, DataType newDt) {
-		if (newDt == this || newDt.getLength() < 0) {
-			newDt = DataType.DEFAULT;
-		}
 		if (dataType == oldDt) {
+			DataTypeUtilities.checkValidReplacement(oldDt, newDt);
+			if (newDt == this) {
+				newDt = DataType.DEFAULT;
+			}
 			String oldName = getName();
 			int oldLength = getLength();
 			int oldAlignment = getAlignment();
@@ -303,17 +303,6 @@ public class ArrayDataType extends DataTypeImpl implements Array {
 				notifyAlignmentChanged();
 			}
 		}
-	}
-
-	@Override
-	public void setCategoryPath(CategoryPath path) throws DuplicateNameException {
-		// unsupported - ignore
-	}
-
-	@Override
-	public void setNameAndCategory(CategoryPath path, String name)
-			throws InvalidNameException, DuplicateNameException {
-		// unsupported - ignore
 	}
 
 	@Override

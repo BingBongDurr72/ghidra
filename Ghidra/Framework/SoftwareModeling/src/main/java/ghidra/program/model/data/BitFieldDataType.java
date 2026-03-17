@@ -102,8 +102,8 @@ public class BitFieldDataType extends AbstractDataType {
 	/**
 	 * Get the effective bit-size based upon the specified base type size.  A bit size
 	 * larger than the base type size will truncated to the base type size.
-	 * @param declaredBitSize
-	 * @param baseTypeByteSize
+	 * @param declaredBitSize declare bitfield size
+	 * @param baseTypeByteSize base datatype size in bytes
 	 * @return effective bit-size
 	 */
 	public static int getEffectiveBitSize(int declaredBitSize, int baseTypeByteSize) {
@@ -184,6 +184,11 @@ public class BitFieldDataType extends AbstractDataType {
 	 * Get the packing storage size in bytes associated with this bit-field which may be
 	 * larger than the base type associated with the fields original definition.
 	 * Returned value is the same as {@link #getLength()}.
+	 * <p>
+	 * NOTE: Bitfields with a bit-size of zero will report a storage size of 1, although 
+	 * {@link #isZeroLength()} will return true.  This is consistent with other datatypes which 
+	 * support a zero-length {@link DataTypeComponent} such as a zero-element Array.
+	 * 
 	 * @return packing storage size in bytes
 	 */
 	public int getStorageSize() {
@@ -331,6 +336,9 @@ public class BitFieldDataType extends AbstractDataType {
 		}
 	}
 
+	/**
+	 * @see #getStorageSize()
+	 */
 	@Override
 	public int getLength() {
 		return storageSize;
@@ -417,9 +425,13 @@ public class BitFieldDataType extends AbstractDataType {
 		if (dt instanceof Enum) {
 			return ((Enum) dt).getRepresentation(big, settings, effectiveBitSize);
 		}
+		if (dt instanceof BooleanDataType) {
+			// TRUE or FALSE representation
+			return ((BooleanDataType) dt).getRepresentation(big, settings, effectiveBitSize);
+		}
 		AbstractIntegerDataType intDT = (AbstractIntegerDataType) dt;
-		if (intDT.getFormatSettingsDefinition()
-				.getFormat(settings) == FormatSettingsDefinition.CHAR) {
+		int format = intDT.getFormatSettingsDefinition().getFormat(settings);
+		if (format == FormatSettingsDefinition.CHAR) {
 			if (big.signum() < 0) {
 				big = big.add(BigInteger.valueOf(2).pow(effectiveBitSize));
 			}
@@ -429,7 +441,7 @@ public class BitFieldDataType extends AbstractDataType {
 			return StringDataInstance.getCharRepresentation(this, bytes, settings);
 		}
 
-		return intDT.getRepresentation(big, settings, effectiveBitSize);
+		return AbstractIntegerDataType.getRepresentation(big, settings, effectiveBitSize, isSigned);
 	}
 
 	@Override

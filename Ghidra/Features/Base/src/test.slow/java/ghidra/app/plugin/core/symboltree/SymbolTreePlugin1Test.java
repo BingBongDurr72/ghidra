@@ -20,7 +20,6 @@ import static org.junit.Assert.*;
 import java.awt.Container;
 import java.awt.datatransfer.Transferable;
 import java.awt.dnd.DnDConstants;
-import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 
 import javax.swing.*;
@@ -40,6 +39,7 @@ import generic.test.AbstractGenericTest;
 import ghidra.app.plugin.core.codebrowser.CodeBrowserPlugin;
 import ghidra.app.plugin.core.marker.MarkerManagerPlugin;
 import ghidra.app.plugin.core.programtree.ProgramTreePlugin;
+import ghidra.app.plugin.core.symboltree.actions.NavigateOnIncomingAction;
 import ghidra.app.plugin.core.symboltree.nodes.*;
 import ghidra.app.services.ProgramManager;
 import ghidra.framework.plugintool.PluginTool;
@@ -74,7 +74,7 @@ public class SymbolTreePlugin1Test extends AbstractGhidraHeadedIntegrationTest {
 	private DockingActionIf selectionAction;
 	private DockingActionIf createNamespaceAction;
 	private DockingActionIf createClassAction;
-	private DockingActionIf goToToggleAction;
+	private DockingActionIf navigateIncomingAction;
 	private DockingActionIf goToExtLocAction;
 	private DockingActionIf createLibraryAction;
 	private DockingActionIf setExternalProgramAction;
@@ -111,6 +111,10 @@ public class SymbolTreePlugin1Test extends AbstractGhidraHeadedIntegrationTest {
 
 	@Test
 	public void testCloseCategoryIfOrgnodesGetOutOfBalance() throws Exception {
+
+		// The default value is 200.  Use a smaller value for testing for speed.
+		runSwing(() -> plugin.setNodeGroupThreshold(20));
+
 		showSymbolTree();
 		GTreeNode functionsNode = rootNode.getChild("Functions");
 		assertFalse(functionsNode.isLoaded());
@@ -336,7 +340,7 @@ public class SymbolTreePlugin1Test extends AbstractGhidraHeadedIntegrationTest {
 		util.selectNode(namespaceNode);
 		performAction(createNamespaceAction, util.getSymbolTreeContext(), true);
 		util.waitForTree();
-		tree.stopEditing();
+		runSwing(() -> tree.stopEditing());
 		GTreeNode fredNode = labelsNode.getChild("fred");
 		util.selectNode(fredNode);
 
@@ -505,8 +509,8 @@ public class SymbolTreePlugin1Test extends AbstractGhidraHeadedIntegrationTest {
 		DefaultTreeCellEditor cellEditor = (DefaultTreeCellEditor) tree.getCellEditor();
 		JTree jTree = (JTree) AbstractGenericTest.getInstanceField("tree", tree);
 
-		Container container = (Container) cellEditor.getTreeCellEditorComponent(jTree, newNsNode,
-			true, true, true, row);
+		Container container = (Container) runSwing(
+			() -> cellEditor.getTreeCellEditorComponent(jTree, newNsNode, true, true, true, row));
 		JTextField textField = (JTextField) container.getComponent(0);
 		assertEquals("NewNamespace", textField.getText());
 	}
@@ -851,7 +855,7 @@ public class SymbolTreePlugin1Test extends AbstractGhidraHeadedIntegrationTest {
 	}
 
 	private void stopEditing() throws Exception {
-		SwingUtilities.invokeAndWait(() -> tree.stopEditing());
+		runSwing(() -> tree.stopEditing());
 	}
 
 	private void renameSelectedNode() throws Exception {
@@ -860,9 +864,8 @@ public class SymbolTreePlugin1Test extends AbstractGhidraHeadedIntegrationTest {
 		waitForEditing();
 	}
 
-	private void setEditorText(final TreePath path, final GTreeNode nsNode, final String newName)
-			throws InterruptedException, InvocationTargetException {
-		SwingUtilities.invokeAndWait(() -> {
+	private void setEditorText(final TreePath path, final GTreeNode nsNode, final String newName) {
+		runSwing(() -> {
 			int row = tree.getRowForPath(path);
 			DefaultTreeCellEditor cellEditor = (DefaultTreeCellEditor) tree.getCellEditor();
 			JTree jTree = (JTree) AbstractGenericTest.getInstanceField("tree", tree);
@@ -879,7 +882,7 @@ public class SymbolTreePlugin1Test extends AbstractGhidraHeadedIntegrationTest {
 
 	private void closeProgram() throws Exception {
 		final ProgramManager pm = tool.getService(ProgramManager.class);
-		SwingUtilities.invokeAndWait(() -> pm.closeProgram());
+		runSwing(() -> pm.closeProgram());
 	}
 
 	private void showSymbolTree() throws Exception {
@@ -913,8 +916,8 @@ public class SymbolTreePlugin1Test extends AbstractGhidraHeadedIntegrationTest {
 		editExternalLocationAction = getAction(plugin, "Edit External Location");
 		assertNotNull(editExternalLocationAction);
 
-		goToToggleAction = getAction(plugin, "Navigation");
-		assertNotNull(goToToggleAction);
+		navigateIncomingAction = getAction(plugin, NavigateOnIncomingAction.NAME);
+		assertNotNull(navigateIncomingAction);
 
 		goToExtLocAction = getAction(plugin, "Go To External Location");
 		assertNotNull(goToExtLocAction);

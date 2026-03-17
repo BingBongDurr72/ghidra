@@ -16,7 +16,6 @@
 package ghidra.program.database.data;
 
 import java.io.IOException;
-import java.net.URL;
 import java.util.Collection;
 
 import org.apache.commons.lang3.StringUtils;
@@ -45,6 +44,7 @@ abstract class DataTypeDB extends DatabaseObject implements DataType {
 	private final static TypeDefSettingsDefinition[] EMPTY_TYPEDEF_DEFINITIONS =
 		new TypeDefSettingsDefinition[0];
 	protected boolean resolving;
+	protected boolean deleting;
 	protected boolean pointerPostResolveRequired;
 	protected Lock lock;
 	private volatile String name;
@@ -56,6 +56,16 @@ abstract class DataTypeDB extends DatabaseObject implements DataType {
 		this.dataMgr = dataMgr;
 		this.record = record;
 		this.lock = dataMgr.lock;
+	}
+
+	/**
+	 * Invoked by {@link DataTypeManagerDB} when operation has started to delete this datatype.
+	 * In this state any invocation of other datatype changes should be ignored as reflected
+	 * by {@code deleting} variable.  Once this state is changed and cannot be reverted for this 
+	 * instance.
+	 */
+	protected final void deleteStarted() {
+		deleting = true;
 	}
 
 	/**
@@ -206,11 +216,6 @@ abstract class DataTypeDB extends DatabaseObject implements DataType {
 		finally {
 			lock.release();
 		}
-	}
-
-	@Override
-	public URL getDocs() {
-		return null;
 	}
 
 	/**

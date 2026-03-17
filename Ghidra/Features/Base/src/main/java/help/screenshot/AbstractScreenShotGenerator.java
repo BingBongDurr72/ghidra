@@ -63,8 +63,8 @@ import ghidra.app.util.viewer.field.AddressFieldFactory;
 import ghidra.app.util.viewer.field.FieldFactory;
 import ghidra.app.util.viewer.format.FieldFormatModel;
 import ghidra.app.util.viewer.format.FormatManager;
+import ghidra.app.util.viewer.listingpanel.ListingMarginProvider;
 import ghidra.app.util.viewer.listingpanel.ListingPanel;
-import ghidra.app.util.viewer.listingpanel.MarginProvider;
 import ghidra.docking.settings.SettingsDefinition;
 import ghidra.framework.ToolUtils;
 import ghidra.framework.plugintool.Plugin;
@@ -87,7 +87,7 @@ import resources.ResourceManager;
 
 public abstract class AbstractScreenShotGenerator extends AbstractGhidraHeadedIntegrationTest {
 
-	private static final String SCREENSHOT_USER_NAME = "User-1";
+	protected static final String SCREENSHOT_USER_NAME = "User-1";
 
 	static {
 		System.setProperty("user.name", "User-1");
@@ -692,6 +692,7 @@ public abstract class AbstractScreenShotGenerator extends AbstractGhidraHeadedIn
 		Assert.assertNotNull("Did not find a dialog to capture for class: " + clazz,
 			dialogProvider);
 		JDialog dialog = (JDialog) getInstanceField("dialog", dialogProvider);
+		dialog.toFront();
 		waitForSwing();
 		paintFix(dialog);
 		runSwing(() -> generateImage(dialog));
@@ -702,7 +703,7 @@ public abstract class AbstractScreenShotGenerator extends AbstractGhidraHeadedIn
 		Assert.assertNotNull("Dialog cannot be null", provider);
 
 		JDialog dialog = (JDialog) getInstanceField("dialog", provider);
-
+		dialog.toFront();
 		paintFix(dialog);
 
 		runSwing(() -> generateImage(dialog));
@@ -1001,7 +1002,10 @@ public abstract class AbstractScreenShotGenerator extends AbstractGhidraHeadedIn
 	public void selectRow(final JTable table, final int rowIndex) {
 		waitForTable(table);
 
-		runSwing(() -> table.setRowSelectionInterval(rowIndex, rowIndex));
+		runSwing(() -> {
+			table.setRowSelectionInterval(rowIndex, rowIndex);
+			table.requestFocus();
+		});
 		waitForTable(table);
 	}
 
@@ -1244,9 +1248,9 @@ public abstract class AbstractScreenShotGenerator extends AbstractGhidraHeadedIn
 			CodeBrowserPlugin plugin = getPlugin(tool, CodeBrowserPlugin.class);
 			ListingPanel listingPanel = plugin.getListingPanel();
 			@SuppressWarnings("unchecked")
-			List<MarginProvider> list =
-				(List<MarginProvider>) getInstanceField("marginProviders", listingPanel);
-			for (MarginProvider marginProvider : list) {
+			List<ListingMarginProvider> list =
+				(List<ListingMarginProvider>) getInstanceField("marginProviders", listingPanel);
+			for (ListingMarginProvider marginProvider : list) {
 				listingPanel.removeMarginProvider(marginProvider);
 			}
 		});

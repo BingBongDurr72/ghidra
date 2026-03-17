@@ -18,7 +18,6 @@ apply plugin: 'eclipse'
 import java.security.MessageDigest
 
 apply from: 'gradle/root/eclipse.gradle'
-apply from: "gradle/support/eclipseLauncher.gradle"
 apply from: "gradle/support/loadApplicationProperties.gradle"
 
 
@@ -95,6 +94,26 @@ allprojects {
 		flatDir name: "flat", dirs:["$flatRepo"]
 	}
 }
+
+/*********************************************************************************
+ *  Force all project compile classpaths to be resolved at configuration time.
+ *********************************************************************************/
+allprojects {
+	gradle.taskGraph.whenReady {
+		configurations.matching { it.name.endsWith("compileClasspath") }.all { cfg ->
+			if (cfg.canBeResolved) {
+				try {
+					cfg.files   // trigger resolution safely now
+				} catch (ignored) { }
+			}
+		}
+	}
+}
+
+/*********************************************************************************
+ *  Store :MarkdownSupport ClassPath to fix issues with Gradle 9.
+ *********************************************************************************/
+ext.markdownDeps = []
 
 /*********************************************************************************
  * Imports

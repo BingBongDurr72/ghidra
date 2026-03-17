@@ -65,7 +65,7 @@ public class SymbolicPropogator {
 
 	private boolean debug = false;
 	
-	private boolean trackStartEndState = false; // track the start/end values for each instruction
+	private boolean recordStartEndState = false; // record the start/end values for registers at each instruction
 
 	private long pointerMask;
 	private int pointerSize;
@@ -103,21 +103,35 @@ public class SymbolicPropogator {
 	// cache for pcode callother injection payloads
 	HashMap<Long, InjectPayload> injectPayloadCache = new HashMap<Long, InjectPayload>();
 
+	/**
+	 * Create SymbolicPropagator for program.
+	 * 
+	 * This will record all values at the beginning and ending of instructions.
+	 * Recording all values can take more time and memory.  So if the SymbolicEvaluator
+	 * callback mechanism is being used, use the alternate constructor with false for
+	 * recordStartEndState.
+	 * 
+	 */
 	public SymbolicPropogator(Program program) {
-		this (program, false);
+		this (program, true);
 	}
 
 	/**
-	 * Create symbolic propagation on program
+	 * Create SymbolicPropagator for program either recording or start/end state at each instruction.
+	 * 
+	 * NOTE: if you are going to inspect values at instructions after {@link SymbolicPropogator}.flowConstants()
+	 * has completed, then you should pass true for recordStartEndState.  If you are using a custom
+	 * SymbolicEvaluator with the flowConstants() method, then you should pass false.
 	 * 
 	 * @param program program
-	 * @param trackStartEndState - true to track the each register at the start/end of each instruction
-	 *                             this will use more memory and be slightly slower
+	 * @param recordStartEndState - true to record the value of each register at the start/end of each
+	 *                      instruction This will use more memory and be slightly slower.  If inspecting
+	 *                      values after flowContants() has completed, you must pass true.
 	 */
-	public SymbolicPropogator(Program program, boolean trackStartEndState) {
+	public SymbolicPropogator(Program program, boolean recordStartEndState) {
 		this.program = program;
 		
-		this.trackStartEndState = trackStartEndState;
+		this.recordStartEndState = recordStartEndState;
 
 		Language language = program.getLanguage();
 
@@ -126,7 +140,7 @@ public class SymbolicPropogator {
 
 		setPointerMask(program);
 
-		context = new VarnodeContext(program, programContext, spaceContext, trackStartEndState);
+		context = new VarnodeContext(program, programContext, spaceContext, recordStartEndState);
 		context.setDebug(debug);
 	}
 
@@ -259,7 +273,7 @@ public class SymbolicPropogator {
 		Language language = program.getLanguage();
 		ProgramContext newValueContext = new ProgramContextImpl(language);
 		ProgramContext newSpaceContext = new ProgramContextImpl(language);
-		VarnodeContext newContext = new VarnodeContext(program, newValueContext, newSpaceContext, trackStartEndState);
+		VarnodeContext newContext = new VarnodeContext(program, newValueContext, newSpaceContext, recordStartEndState);
 		newContext.setDebug(debug);
 
 		programContext = newValueContext;
@@ -318,8 +332,9 @@ public class SymbolicPropogator {
 
 	/**
 	 * Get constant or register relative value assigned to the 
-	 * specified register at the specified address
-	 * Note: This can only be called safely if trackStartEndState flag is true.
+	 * specified register at the specified address.
+	 * 
+	 * Note: This can only be called safely if recordStartEndState flag is true.
 	 * Otherwise it will just return the current value, not the value at the given address.
 	 * 
 	 * @param toAddr address
@@ -349,13 +364,13 @@ public class SymbolicPropogator {
 	/**
 	 * Get constant or register relative value assigned to the 
 	 * specified register at the specified address after the instruction has executed.
-	 * Note: This can only be called if trackStartEndState flag is true.
+	 * Note: This can only be called if recordStartEndState flag is true.
 	 * 
 	 * @param toAddr address
 	 * @param reg register
 	 * @return register value
 	 * 
-	 * @throws UnsupportedOperationException trackStartEndState == false at construction
+	 * @throws UnsupportedOperationException recordStartEndState == false at construction
 	 */
 	public Value getEndRegisterValue(Address toAddr, Register reg) {
 
@@ -435,7 +450,7 @@ public class SymbolicPropogator {
 			this.destination = destination;
 			this.pcodeIndex = pcodeIndex;
 			this.continueAfterHittingFlow = continueAfterHittingFlow;
-			vContext.pushMemState();
+			vContext.pushMemState(pcodeIndex != 0);
 		}
 		
 		public boolean isContinueAfterHittingFlow() {
@@ -469,6 +484,9 @@ public class SymbolicPropogator {
 			throws CancelledException {
 		visitedBody = new AddressSet();
 		AddressSet conflicts = new AddressSet();
+		
+		// Locations that were jump and are now call targets and might be on saved future flows
+		HashSet<Address> doNotFlowTo = new HashSet<>();
 
 		// prime the context stack with the entry point address
 		Stack<SavedFlowState> contextStack = new Stack<>();
@@ -520,6 +538,11 @@ public class SymbolicPropogator {
 						continue;
 					}
 				}
+			}
+			
+			// don't follow flow if on list of jump targets that were turned into calls
+			if (doNotFlowTo.contains(nextAddr)) {
+				continue;
 			}
 
 			HashSet<Address> visitSet = visitedMap.get(nextAddr);
@@ -621,6 +644,9 @@ public class SymbolicPropogator {
 					Address targets[] = getInstructionFlows(instr);
 					for (Address target : targets) {
 						handleFunctionSideEffects(instr, target, monitor);
+						// a jump target has already been pushed as a future flow trace
+						// need to make sure values aren't propagated into the call targets
+						doNotFlowTo.add(target);
 					}
 				}
 				
@@ -864,12 +890,24 @@ public class SymbolicPropogator {
 			try {
 				switch (ptype) {
 					case PcodeOp.COPY:
-						if (in[0].isAddress() &&
-							!in[0].getAddress().getAddressSpace().hasMappedRegisters()) {
-							makeReference(vContext, instruction,  Reference.MNEMONIC, in[0],
-								null, RefType.READ, ptype, true, monitor);
+						if (in[0].isAddress()) {
+							AddressSpace addressSpace = in[0].getAddress().getAddressSpace();
+							// if not address mapped, or no register defined there
+							if (!addressSpace.hasMappedRegisters() || program.getRegister(in[0]) == null) {
+							    makeReference(vContext, instruction,  Reference.MNEMONIC, in[0],
+								    null, RefType.READ, ptype, true, monitor);
+							}
 						}
 						vContext.copy(out, in[0], mustClearAll, evaluator);
+						break;
+						
+					case PcodeOp.SEGMENTOP:
+						// treat like a copy for now, and extend the size as if segment had been applied
+						Varnode vval = context.getValue(in[2], evaluator);
+						if (context.isSymbolicSpace(vval.getSpace())) { 
+							vval = vContext.createVarnode(vval.getOffset(), vval.getSpace(), out.getSize());
+						}
+						vContext.putValue(out, vval, mustClearAll);
 						break;
 
 					case PcodeOp.LOAD:
@@ -979,12 +1017,20 @@ public class SymbolicPropogator {
 										if (refs.length <= 0 ||
 											!refs[0].getToAddress().equals(target)) {
 	
+											Address oldTarget = target;
 											target = makeReference(vContext, instruction, Reference.MNEMONIC,
 												//  Use target in case location has shifted (external...)
 												target.getAddressSpace().getSpaceID(),
 												target.getAddressableWordOffset(), val1.getSize(),
 												null,
 												instruction.getFlowType(), ptype, !suspectOffset, false, monitor);
+											if (target == null) {
+												// Target was nulled out, restore old target.
+												// Need to handle function call side-effects even if didn't make a reference
+												// The target can be changed by makeReference(), but if it is nulled out, then
+												// it indicates the reference was already made.
+												target = oldTarget;
+											}
 										}
 									}
 								}
@@ -1828,7 +1874,7 @@ public class SymbolicPropogator {
 		for (int i = 1; i < ins.length; i++) {
 			Varnode vval = context.getValue(ins[i], evaluator);
 			if (vval == null || !context.isConstant(vval)) {
-				return null;
+				return checkSegmentCallOther(payload, instr, ins, out);
 			}
 			inputs.add(vval);
 		}
@@ -1850,6 +1896,29 @@ public class SymbolicPropogator {
 			Msg.warn(this, e.getMessage());
 		}
 		return null;
+	}
+
+	private PcodeOp[] checkSegmentCallOther(InjectPayload payload, Instruction instr, Varnode[] ins, Varnode out) {
+		if (!payload.getName().equals("segment_pcode")) {
+			return null;
+		}
+		if (ins.length != 3) {
+			return null;
+		}
+		Varnode vval = context.getValue(ins[2], evaluator);
+		if (vval == null) {
+			return null;
+		}
+		if (!context.isSymbolicSpace(vval.getSpace())) { 
+			return null;
+		}
+		if (!context.isRegister(ins[1])) {
+			return null;
+		}
+		// morph segment into COPY as long as still symbolic
+		PcodeOp[] newop = new PcodeOp[1];
+		newop[0] = new PcodeOp(instr.getAddress(), 1, PcodeOp.SEGMENTOP, ins, out);
+		return newop;
 	}
 
 	private InjectPayload findPcodeInjection(Program prog, PcodeInjectLibrary snippetLibrary,
@@ -1965,11 +2034,6 @@ public class SymbolicPropogator {
 			VarnodeContext varnodeContext, TaskMonitor monitor) {
 
 		if (!checkForParamRefs) {
-			return;
-		}
-
-		// don't check for params on external calls
-		if (callTarget != null && callTarget.isExternalAddress()) {
 			return;
 		}
 

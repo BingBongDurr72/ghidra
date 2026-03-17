@@ -468,13 +468,22 @@ public class GTree extends JPanel implements BusyListener {
 	public void collapseAll(GTreeNode node) {
 
 		runSwingNow(() -> {
+
+			if (!isFiltered() && lastFilterTask != null) {
+				// When the user clears the filter, the filter task may be running to restore state.
+				// If the user wishes to collapse nodes, it does not make sense to keep restoring
+				// expanded/selected state.  This call allows users to cancel any long running tree
+				// state restoring by executing a collapse action.
+				lastFilterTask.cancel();
+			}
+
 			node.fireNodeStructureChanged();
 			tree.collapsePath(node.getTreePath());
 
 			boolean nodeIsRoot = node.equals(model.getRoot());
 
 			if (nodeIsRoot && !tree.isRootAllowedToCollapse()) {
-				runTask(new GTreeExpandNodeToDepthTask(this, getJTree(), node, 1));
+				runTask(new GTreeExpandNodeToDepthTask(this, node, 1));
 			}
 
 		});
@@ -509,6 +518,10 @@ public class GTree extends JPanel implements BusyListener {
 	 */
 	public void expandAndSelectPaths(List<TreePath> paths) {
 		setSelectionPaths(paths, true, EventOrigin.API_GENERATED);
+	}
+
+	public void addSelectionPath(TreePath path) {
+		tree.addSelectionPath(path);
 	}
 
 	public void setSelectedNode(GTreeNode node) {
@@ -1080,10 +1093,6 @@ public class GTree extends JPanel implements BusyListener {
 
 	public void setRowHeight(int rowHeight) {
 		tree.setRowHeight(rowHeight);
-	}
-
-	public void addSelectionPath(TreePath path) {
-		tree.addSelectionPath(path);
 	}
 
 	public void addTreeExpansionListener(TreeExpansionListener listener) {
@@ -1686,7 +1695,7 @@ public class GTree extends JPanel implements BusyListener {
 
 			if (!allowed) {
 				if (model != null && model.getRoot() != null) {
-					runTask(new GTreeExpandNodeToDepthTask(GTree.this, getJTree(),
+					runTask(new GTreeExpandNodeToDepthTask(GTree.this,
 						model.getModelRoot(), 1));
 				}
 			}
@@ -1969,22 +1978,43 @@ public class GTree extends JPanel implements BusyListener {
 			)
 		);
 		activateFilterAction.setKeyBindingData(new KeyBindingData("Control F"));
-		activateFilterAction.setHelpLocation(new HelpLocation("Trees", "Toggle_Filter"));
-		
-		GTreeAction toggleFilterAction = new GTreeAction("Table/Tree Toggle Filter", owner) {
+		activateFilterAction.setHelpLocation(new HelpLocation("Trees", "Activate_Filter"));
+		//@formatter:on
+
+		GTreeAction hideFilterAction = new GTreeAction("Table/Tree Hide Filter", owner) {
 			@Override
 			public void actionPerformed(ActionContext context) {
 				GTree gTree = getTree(context);
-				gTree.filterProvider.toggleVisibility();				
+				gTree.filterProvider.close();
+			}
+
+			@Override
+			public boolean isValidComponentContext(ActionContext context) {
+				/*
+				 			Subtle Code Alert!
+				 	We use this method to signal that this action is only to be included in the key
+				 	binding processing when the filter is showing.  This is different than normal
+				 	docking actions in that normal actions are always valid, just enabled/disabled.
+				 	Returning false here prevents this action from interfering with key bindings 
+				 	further up the processing chain when the filter is not showing.
+				 */
+				if (!super.isValidComponentContext(context)) {
+					return false;
+				}
+
+				GTree gTree = getTree(context);
+				return gTree.filterProvider.isShowing();
 			}
 		};
-		//@formatter:on
-		toggleFilterAction.setPopupMenuData(new MenuData(
-			new String[] { "Toggle Filter" },
+
+		//@formatter:off
+		hideFilterAction.setPopupMenuData(new MenuData(
+			new String[] { "Hide Filter" },
 			null,
 			actionMenuGroup, NO_MNEMONIC,
 			Integer.toString(subGroupIndex++)));
-		toggleFilterAction.setHelpLocation(new HelpLocation("Trees", "Toggle_Filter"));
+		hideFilterAction.setHelpLocation(new HelpLocation("Trees", "Hide_Filter"));
+		//@formatter:on
 
 		// these actions are self-explanatory and do need help
 		collapseAction.markHelpUnnecessary();
@@ -1998,7 +2028,7 @@ public class GTree extends JPanel implements BusyListener {
 		toolActions.addGlobalAction(expandTreeAction);
 		toolActions.addGlobalAction(copyFormattedAction);
 		toolActions.addGlobalAction(activateFilterAction);
-		toolActions.addGlobalAction(toggleFilterAction);
+		toolActions.addGlobalAction(hideFilterAction);
 	}
 
 	private static String generateFilterPreferenceKey() {

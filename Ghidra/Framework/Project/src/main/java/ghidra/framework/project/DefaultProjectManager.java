@@ -127,20 +127,9 @@ public class DefaultProjectManager implements ProjectManager {
 			throw new LockException(msg);
 		}
 
-		if (!projectLocator.getMarkerFile().exists()) {
-			forgetProject(projectLocator);
-			throw new NotFoundException(
-				"Project marker file not found: " + projectLocator.getMarkerFile());
-		}
-
-		if (!projectLocator.getProjectDir().isDirectory()) {
-			forgetProject(projectLocator);
-			throw new NotFoundException(
-				"Project directory not found: " + projectLocator.getProjectDir());
-		}
-
 		try {
 			currentProject = new DefaultProject(this, projectLocator, resetOwner);
+			AppInfo.setActiveProject(currentProject);
 			if (doRestore) {
 				currentProject.restore();
 			}
@@ -164,7 +153,6 @@ public class DefaultProjectManager implements ProjectManager {
 			throw e;
 		}
 		finally {
-			AppInfo.setActiveProject(currentProject);
 			if (currentProject == null) {
 				File dirFile = projectLocator.getProjectDir();
 				if (!dirFile.exists() || !dirFile.isDirectory()) {
@@ -546,7 +534,7 @@ public class DefaultProjectManager implements ProjectManager {
 			}
 		}
 		catch (IllegalArgumentException e) {
-			Msg.error(this, "Invalid project path: " + path);
+			Msg.error(this, "Invalid project path: " + path, e);
 		}
 		return null;
 	}
@@ -562,7 +550,7 @@ public class DefaultProjectManager implements ProjectManager {
 			String urlStr = (String) st.nextElement();
 			try {
 				URL url = GhidraURL.toURL(urlStr);
-				if (GhidraURL.isLocalProjectURL(url) && !GhidraURL.localProjectExists(url)) {
+				if (GhidraURL.isLocalURL(url) && !GhidraURL.localProjectExists(url)) {
 					continue;
 				}
 				list.add(url);

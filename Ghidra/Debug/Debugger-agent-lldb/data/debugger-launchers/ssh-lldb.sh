@@ -14,7 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 ##
-#@timeout 60000
 #@title lldb via ssh
 #@image-opt arg:1
 #@desc <html><body width="300px">
@@ -27,6 +26,7 @@
 #@menu-group lldb
 #@icon icon.debugger
 #@help lldb#ssh
+#@depends Debugger-rmi-trace
 #@enum StartCmd:str "process launch" "process launch --stop-at-entry"
 #@enum Endian:str auto big little
 #@arg :str "Image" "The target binary executable image on the remote system"
@@ -36,6 +36,7 @@
 #@env OPT_REMOTE_PORT:int=12345 "Remote Trace RMI Port" "A free port on the remote end to receive and forward the Trace RMI connection."
 #@env OPT_EXTRA_SSH_ARGS:str="" "Extra ssh arguments" "Extra arguments to pass to ssh. Use with care."
 #@env OPT_LLDB_PATH:str="lldb" "lldb command" "The path to lldb on the remote system. Omit the full path to resolve using the system PATH."
+#@env OPT_LLDB_ARGS:str="" "lldb cmd args" "Arguments passed to lldb (versus the target)"
 #@env OPT_START_CMD:StartCmd="process launch" "Run command" "The lldb command to actually run the target."
 #@env OPT_ARCH:str="x86_64" "Architecture" "Target architecture"
 
@@ -56,7 +57,7 @@ version=$(get-ghidra-version)
 
 function do-installation() {
 	local -a pipargs
-	compute-lldb-pipinstall-args "'-f'" "os.environ['HOME']" "'ghidralldb==$version'"
+	compute-lldb-pipinstall-args "'-f'" "os.environ['HOME']" "'ghidralldb>=$version'"
 	local -a sshargs
 	compute-ssh-args false "${pipargs[@]}"
 
@@ -89,10 +90,10 @@ are copied and installed.
 
 NOTE: Automatic resolution may cause this session to terminate. When it has
 finished, try launching again.
-" "Would you like to install 'ghidralldb==$version'?"; then
+" "Would you like to install 'ghidralldb>=$version'?"; then
 
 	echo "Copying Wheels to $OPT_HOST"
-	mitigate-scp-pymodules "Debug/Debugger-rmi-trace" "Debug/Debugger-agent-lldb"
+	mitigate-scp-pymodules "Debugger-rmi-trace" "<SELF>"
 
 	echo "Installing Wheels into LLDB's embedded Python"
 	do-installation

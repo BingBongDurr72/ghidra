@@ -23,6 +23,7 @@ import java.awt.Component;
 import javax.swing.*;
 
 import docking.widgets.button.BrowseButton;
+import docking.widgets.textfield.ElidingFilePathTextField;
 import ghidra.app.util.Option;
 import ghidra.app.util.opinion.Loader;
 import ghidra.framework.main.AppInfo;
@@ -40,9 +41,10 @@ public class DomainFolderOption extends Option {
 	 * 
 	 * @param name The name of the option
 	 * @param arg The option's command line argument (could be null)
+	 * @param hidden true if this option should be hidden from the user; otherwise, false
 	 */
-	public DomainFolderOption(String name, String arg) {
-		super(name, String.class, "", arg, null, Loader.OPTIONS_PROJECT_SAVE_STATE_KEY, false);
+	public DomainFolderOption(String name, String arg, boolean hidden) {
+		super(name, String.class, "", arg, null, Loader.OPTIONS_PROJECT_SAVE_STATE_KEY, hidden);
 	}
 
 	@Override
@@ -52,8 +54,9 @@ public class DomainFolderOption extends Option {
 		String lastFolderPath =
 			state != null ? state.getString(getName(), defaultValue) : defaultValue;
 		setValue(lastFolderPath);
-		JTextField textField = new JTextField(lastFolderPath);
+		JTextField textField = new ElidingFilePathTextField(lastFolderPath);
 		textField.setEditable(false);
+		textField.setColumns(10);
 		JButton button = new BrowseButton();
 		button.addActionListener(e -> {
 			DataTreeDialog dataTreeDialog =
@@ -85,6 +88,6 @@ public class DomainFolderOption extends Option {
 
 	@Override
 	public Option copy() {
-		return new DomainFolderOption(getName(), getArg());
+		return new DomainFolderOption(getName(), getArg(), isHidden());
 	}
 }

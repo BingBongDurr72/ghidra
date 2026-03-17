@@ -29,7 +29,6 @@ import docking.DockingUtils;
 import docking.util.AnimationUtils;
 import docking.util.SwingAnimationCallback;
 import docking.widgets.EventTrigger;
-import docking.widgets.SearchLocation;
 import docking.widgets.fieldpanel.FieldPanel;
 import docking.widgets.fieldpanel.LayoutModel;
 import docking.widgets.fieldpanel.field.Field;
@@ -44,6 +43,7 @@ import ghidra.app.decompiler.component.margin.*;
 import ghidra.app.decompiler.location.*;
 import ghidra.app.plugin.core.decompile.DecompilerClipboardProvider;
 import ghidra.app.plugin.core.decompile.actions.DecompilerSearchLocation;
+import ghidra.app.plugin.core.decompile.actions.DecompilerSearchResults;
 import ghidra.app.util.viewer.util.ScrollpaneAlignedHorizontalLayout;
 import ghidra.program.model.address.*;
 import ghidra.program.model.listing.*;
@@ -90,19 +90,23 @@ public class DecompilerPanel extends JPanel implements FieldMouseListener, Field
 		}
 	});
 
+	private Set<String> ignoredMiddleMouseTokens = Set.of("{", "}", ";");
 	private ActiveMiddleMouse activeMiddleMouse;
 	private int middleMouseHighlightButton;
 	private Color middleMouseHighlightColor;
 	private Color currentVariableHighlightColor;
+
+	private Color activeSearchHighlightColor;
 	private Color searchHighlightColor;
-	private SearchLocation currentSearchLocation;
+
+	private DecompilerSearchResults currentSearchResults;
 
 	private DecompileData decompileData = new EmptyDecompileData("No Function");
 	private final DecompilerClipboardProvider clipboard;
 
 	private Color originalBackgroundColor;
 	private boolean useNonFunctionColor = false;
-	private boolean navitationEnabled = true;
+	private boolean navigationEnabled = true;
 
 	private DecompilerHoverProvider decompilerHoverProvider;
 
@@ -144,6 +148,7 @@ public class DecompilerPanel extends JPanel implements FieldMouseListener, Field
 
 		decompilerHoverProvider = new DecompilerHoverProvider();
 
+		activeSearchHighlightColor = options.getActiveSearchHighlightColor();
 		searchHighlightColor = options.getSearchHighlightColor();
 		currentVariableHighlightColor = options.getCurrentVariableHighlightColor();
 		middleMouseHighlightColor = options.getMiddleMouseHighlightColor();
@@ -264,13 +269,36 @@ public class DecompilerPanel extends JPanel implements FieldMouseListener, Field
 		}
 
 		// exclude tokens that users do not want to highlight
-		if (token instanceof ClangSyntaxToken || token instanceof ClangOpToken) {
+		if (shouldIgnoreOpToken(token)) {
+			return;
+		}
+		if (shouldIgnoreSyntaxTokenHighlight(token)) {
 			return;
 		}
 
 		ActiveMiddleMouse newMiddleMouse = new ActiveMiddleMouse(token.getText());
 		newMiddleMouse.apply();
 		activeMiddleMouse = newMiddleMouse;
+	}
+
+	private boolean shouldIgnoreOpToken(ClangToken token) {
+		if (!(token instanceof ClangOpToken)) {
+			return false;
+		}
+
+		// users would like to be able to highlight return statements
+		String text = token.toString();
+		return !text.equals("return");
+	}
+
+	private boolean shouldIgnoreSyntaxTokenHighlight(ClangToken token) {
+
+		if (!(token instanceof ClangSyntaxToken syntaxToken)) {
+			return false;
+		}
+
+		String string = syntaxToken.toString();
+		return ignoredMiddleMouseTokens.contains(string);
 	}
 
 	void addHighlighterHighlights(ClangDecompilerHighlighter highlighter,
@@ -511,7 +539,10 @@ public class DecompilerPanel extends JPanel implements FieldMouseListener, Field
 		}
 
 		// don't highlight search results across functions
-		currentSearchLocation = null;
+		if (currentSearchResults != null) {
+			currentSearchResults.decompilerUpdated();
+			currentSearchResults = null;
+		}
 
 		if (function != null) {
 			highlightController.reapplyAllHighlights(function);
@@ -734,7 +765,7 @@ public class DecompilerPanel extends JPanel implements FieldMouseListener, Field
 	 * @param enabled false disabled mouse function navigation
 	 */
 	void setMouseNavigationEnabled(boolean enabled) {
-		navitationEnabled = enabled;
+		navigationEnabled = enabled;
 	}
 
 	@Override
@@ -745,7 +776,6 @@ public class DecompilerPanel extends JPanel implements FieldMouseListener, Field
 
 		int clickCount = ev.getClickCount();
 		int buttonState = ev.getButton();
-
 		if (buttonState == MouseEvent.BUTTON1) {
 			if (DockingUtils.isControlModifier(ev) && clickCount == 2) {
 				tryToGoto(location, field, ev, true);
@@ -765,7 +795,7 @@ public class DecompilerPanel extends JPanel implements FieldMouseListener, Field
 
 	private void tryToGoto(FieldLocation location, Field field, MouseEvent event,
 			boolean newWindow) {
-		if (!navitationEnabled) {
+		if (!navigationEnabled) {
 			return;
 		}
 
@@ -864,6 +894,13 @@ public class DecompilerPanel extends JPanel implements FieldMouseListener, Field
 			if (addr.isMemoryAddress()) {
 				controller.goToAddress(vn.getAddress(), newWindow);
 			}
+		}
+		else if (highVar.getSymbol() != null) {
+			VariableStorage storage = highVar.getSymbol().getStorage();
+			if (storage.isMemoryStorage()) {
+				controller.goToAddress(storage.getMinAddress(), newWindow);
+			}
+			return;		// Don't goto if symbol is on the stack or in a register
 		}
 		else if (vn.isConstant()) {
 			controller.goToScalar(vn.getOffset(), newWindow);
@@ -1047,7 +1084,7 @@ public class DecompilerPanel extends JPanel implements FieldMouseListener, Field
 		}
 
 		HighSymbol highSymbol = highVar.getSymbol();
-		if (highSymbol.isParameter()) {
+		if (highSymbol != null && highSymbol.isParameter()) {
 			// decomp param that is not in the listing; put on signature
 			return new FunctionNameDecompilerLocation(program, entryPoint, cvt.getText(), info);
 		}
@@ -1082,13 +1119,32 @@ public class DecompilerPanel extends JPanel implements FieldMouseListener, Field
 		return null;
 	}
 
-	public void setSearchResults(SearchLocation searchLocation) {
-		currentSearchLocation = searchLocation;
+	public void clearSearchResults(DecompilerSearchResults searchResults) {
+		if (currentSearchResults == searchResults) {
+			currentSearchResults = null;
+			repaint();
+		}
+	}
+
+	public void setSearchResults(DecompilerSearchResults searchResults) {
+		currentSearchResults = searchResults;
+
+		if (currentSearchResults != null) {
+			DecompilerSearchLocation location = currentSearchResults.getActiveLocation();
+			if (location != null) {
+				setCursorPosition(location.getFieldLocation());
+			}
+		}
+
 		repaint();
 	}
 
-	public DecompilerSearchLocation getSearchResults() {
-		return (DecompilerSearchLocation) currentSearchLocation;
+	public DecompilerSearchLocation getActiveSearchLocation() {
+		if (currentSearchResults == null) {
+			return null;
+		}
+		DecompilerSearchLocation location = currentSearchResults.getActiveLocation();
+		return location;
 	}
 
 	public Color getCurrentVariableHighlightColor() {
@@ -1347,23 +1403,30 @@ public class DecompilerPanel extends JPanel implements FieldMouseListener, Field
 
 		@Override
 		public Highlight[] createHighlights(Field field, String text, int cursorTextOffset) {
-			if (currentSearchLocation == null) {
+			if (currentSearchResults == null) {
 				return new Highlight[0];
 			}
 
 			ClangTextField cField = (ClangTextField) field;
-			int highlightLine = cField.getLineNumber();
-
-			FieldLocation searchCursorLocation =
-				((DecompilerSearchLocation) currentSearchLocation).getFieldLocation();
-			int searchLineNumber = searchCursorLocation.getIndex().intValue() + 1;
-			if (highlightLine != searchLineNumber) {
-				// only highlight the match on the actual line
+			int lineNumber = cField.getLineNumber();
+			Map<Integer, List<DecompilerSearchLocation>> locationsByLine =
+				currentSearchResults.getLocationsByLine();
+			List<DecompilerSearchLocation> locationsOnLine = locationsByLine.get(lineNumber);
+			if (locationsOnLine == null) {
 				return new Highlight[0];
 			}
 
-			return new Highlight[] { new Highlight(currentSearchLocation.getStartIndexInclusive(),
-				currentSearchLocation.getEndIndexInclusive(), searchHighlightColor) };
+			DecompilerSearchLocation activeLocation = currentSearchResults.getActiveLocation();
+			List<Highlight> highlights = new ArrayList<>();
+			for (DecompilerSearchLocation location : locationsOnLine) {
+				Color c =
+					location == activeLocation ? activeSearchHighlightColor : searchHighlightColor;
+				int start = location.getStartIndexInclusive();
+				int end = location.getEndIndexInclusive();
+				highlights.add(new Highlight(start, end, c));
+			}
+
+			return highlights.toArray(Highlight[]::new);
 		}
 	}
 

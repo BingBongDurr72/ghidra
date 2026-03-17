@@ -33,6 +33,7 @@ import ghidra.GhidraOptions;
 import ghidra.app.decompiler.*;
 import ghidra.app.decompiler.component.*;
 import ghidra.app.decompiler.component.margin.DecompilerMarginProvider;
+import ghidra.app.events.ProgramSelectionPluginEvent;
 import ghidra.app.nav.*;
 import ghidra.app.plugin.core.decompile.actions.*;
 import ghidra.app.services.*;
@@ -58,8 +59,6 @@ import utility.function.Callback;
 public class DecompilerProvider extends NavigatableComponentProviderAdapter
 		implements OptionsChangeListener, DecompilerCallbackHandler, DecompilerHighlightService,
 		DecompilerMarginService {
-
-	private static final String OPTIONS_TITLE = "Decompiler";
 
 	private static final Icon REFRESH_ICON = Icons.REFRESH_ICON;
 	private static final Icon C_SOURCE_ICON = new GIcon("icon.decompiler.action.provider");
@@ -198,7 +197,7 @@ public class DecompilerProvider extends NavigatableComponentProviderAdapter
 	public void componentShown() {
 		if (program != null && currentLocation != null) {
 			ToolOptions fieldOptions = tool.getOptions(GhidraOptions.CATEGORY_BROWSER_FIELDS);
-			ToolOptions opt = tool.getOptions(OPTIONS_TITLE);
+			ToolOptions opt = tool.getOptions(DecompilePlugin.OPTIONS_TITLE);
 			decompilerOptions.grabFromToolAndProgram(fieldOptions, opt, program);
 			controller.setOptions(decompilerOptions);
 
@@ -312,7 +311,7 @@ public class DecompilerProvider extends NavigatableComponentProviderAdapter
 			return;
 		}
 		ToolOptions fieldOptions = tool.getOptions(GhidraOptions.CATEGORY_BROWSER_FIELDS);
-		ToolOptions opt = tool.getOptions(OPTIONS_TITLE);
+		ToolOptions opt = tool.getOptions(DecompilePlugin.OPTIONS_TITLE);
 
 		// Current values of toggle buttons
 		boolean decompilerEliminatesUnreachable = decompilerOptions.isEliminateUnreachable();
@@ -368,7 +367,7 @@ public class DecompilerProvider extends NavigatableComponentProviderAdapter
 			return;
 		}
 
-		if (options.getName().equals(OPTIONS_TITLE) ||
+		if (options.getName().equals(DecompilePlugin.OPTIONS_TITLE) ||
 			options.getName().equals(GhidraOptions.CATEGORY_BROWSER_FIELDS)) {
 			doRefresh(true);
 		}
@@ -419,7 +418,7 @@ public class DecompilerProvider extends NavigatableComponentProviderAdapter
 		if (program != null) {
 			program.addListener(programListener);
 			ToolOptions fieldOptions = tool.getOptions(GhidraOptions.CATEGORY_BROWSER_FIELDS);
-			ToolOptions opt = tool.getOptions(OPTIONS_TITLE);
+			ToolOptions opt = tool.getOptions(DecompilePlugin.OPTIONS_TITLE);
 			decompilerOptions.grabFromToolAndProgram(fieldOptions, opt, program);
 		}
 
@@ -435,6 +434,20 @@ public class DecompilerProvider extends NavigatableComponentProviderAdapter
 		}
 
 		clipboardProvider.setSelection(selection);
+		notifySelectionChanged(selection);
+	}
+
+	private void notifySelectionChanged(ProgramSelection selection) {
+		if (!isConnected()) {
+			return;
+		}
+
+		if (selection == null) {
+			return;
+		}
+
+		plugin.firePluginEvent(
+			new ProgramSelectionPluginEvent(plugin.getName(), selection, getProgram()));
 	}
 
 	@Override
@@ -738,21 +751,26 @@ public class DecompilerProvider extends NavigatableComponentProviderAdapter
 		Function function = controller.getDecompileData().getFunction();
 		String programName = (program != null) ? program.getDomainFile().getName() : "";
 		String title = "Decompiler";
+		String functionName = "No Function";
+		String tabText = "Decompiler";
 		String subTitle = "";
 		if (function != null) {
-			title = "Decompile: " + function.getName();
+			functionName = function.getName();
+			title = "Decompile: " + functionName;
 			subTitle = " (" + programName + ")";
 		}
 		if (!isConnected()) {
 			title = "[" + title + "]";
+			tabText = "[" + functionName + "]";
 		}
 		setTitle(title);
 		setSubTitle(subTitle);
+		setTabText(tabText);
 	}
 
 	private void initializeDecompilerOptions() {
 		ToolOptions fieldOptions = tool.getOptions(GhidraOptions.CATEGORY_BROWSER_FIELDS);
-		ToolOptions opt = tool.getOptions(OPTIONS_TITLE);
+		ToolOptions opt = tool.getOptions(DecompilePlugin.OPTIONS_TITLE);
 		HelpLocation helpLocation = new HelpLocation(HelpTopics.DECOMPILER, "GeneralOptions");
 		opt.setOptionsHelpLocation(helpLocation);
 		opt.getOptions("Analysis")
@@ -931,6 +949,9 @@ public class DecompilerProvider extends NavigatableComponentProviderAdapter
 
 		RenameFieldAction renameFieldAction = new RenameFieldAction();
 		setGroupInfo(renameFieldAction, variableGroup, subGroupPosition++);
+
+		RenameBitFieldAction renameBitFieldAction = new RenameBitFieldAction();
+		setGroupInfo(renameBitFieldAction, variableGroup, subGroupPosition++);
 
 		ForceUnionAction forceUnionAction = new ForceUnionAction();
 		setGroupInfo(forceUnionAction, variableGroup, subGroupPosition++);
@@ -1114,6 +1135,7 @@ public class DecompilerProvider extends NavigatableComponentProviderAdapter
 		CloneDecompilerAction cloneDecompilerAction = new CloneDecompilerAction();
 		GoToNextBraceAction goToNextBraceAction = new GoToNextBraceAction();
 		GoToPreviousBraceAction goToPreviousBraceAction = new GoToPreviousBraceAction();
+		DisplayTypeCastsAction displayTypeCastsAction = new DisplayTypeCastsAction(plugin);
 
 		addLocalAction(refreshAction);
 		addLocalAction(displayUnreachableCodeToggle);
@@ -1129,6 +1151,7 @@ public class DecompilerProvider extends NavigatableComponentProviderAdapter
 		addLocalAction(renameLocalAction);
 		addLocalAction(renameGlobalAction);
 		addLocalAction(renameFieldAction);
+		addLocalAction(renameBitFieldAction);
 		addLocalAction(forceUnionAction);
 		addLocalAction(setSecondaryHighlightAction);
 		addLocalAction(setSecondaryHighlightColorChooserAction);
@@ -1163,6 +1186,7 @@ public class DecompilerProvider extends NavigatableComponentProviderAdapter
 		addLocalAction(renameLabelAction);
 		addLocalAction(removeLabelAction);
 		addLocalAction(debugFunctionAction);
+		addLocalAction(displayTypeCastsAction);
 		addLocalAction(convertAction);
 		addLocalAction(findAction);
 		addLocalAction(findReferencesAction);

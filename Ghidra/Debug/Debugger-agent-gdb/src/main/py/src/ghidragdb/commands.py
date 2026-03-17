@@ -17,15 +17,11 @@ from concurrent.futures import Future
 from contextlib import contextmanager
 import inspect
 import os.path
+import re
 import socket
 import time
 from typing import (Any, Callable, Dict, Generator, List, Optional, Sequence,
                     Tuple, Type, TypeVar, Union)
-
-try:
-    import psutil
-except ImportError:
-    print(f"Unable to import 'psutil' - check that it has been installed")
 
 from ghidratrace import sch
 from ghidratrace.client import (Client, Address, AddressRange, Lifespan,
@@ -287,7 +283,7 @@ def compute_name() -> str:
     if progname is None:
         return 'gdb/noname'
     else:
-        return 'gdb/' + progname.split('/')[-1]
+        return 'gdb/' + re.split(r'(/|\\)', progname)[-1]
 
 
 def start_trace(name: str) -> None:
@@ -1070,18 +1066,16 @@ def ghidra_trace_put_inferiors(*, is_mi: bool, **kwargs) -> None:
         put_inferiors()
 
 
-def put_available() -> None:
-    # TODO: Compared to -list-thread-groups --available:
-    #     Is that always from the host, or can that pslist a remote target?
-    #     psutil will always be from the host.
+def put_available() -> List[util.Available]:
     trace = STATE.require_trace()
+    availables = util.AVAILABLE_INFO_READER.get_availables()
     keys = []
-    for proc in psutil.process_iter():
+    for proc in availables:
         ppath = AVAILABLE_PATTERN.format(pid=proc.pid)
         procobj = trace.create_object(ppath)
         keys.append(AVAILABLE_KEY_PATTERN.format(pid=proc.pid))
         procobj.set_value('PID', proc.pid)
-        procobj.set_value('_display', f'{proc.pid} {proc.name()}')
+        procobj.set_value('_display', f'{proc.pid} {proc.command}')
         procobj.insert()
     trace.proxy_object_path(AVAILABLES_PATH).retain_values(keys)
 
@@ -1280,7 +1274,10 @@ def put_modules(modules: Optional[Dict[str, util.Module]] = None,
         base_base, base_addr = mapper.map(inf, m.base)
         if base_base != base_addr.space:
             trace.create_overlay_space(base_base, base_addr.space)
-        modobj.set_value('Range', base_addr.extend(m.max - m.base))
+        if m.max == m.base:
+            modobj.set_value('Base', m.base)
+        else:
+            modobj.set_value('Range', base_addr.extend(m.max - m.base))
         if sections:
             sec_keys = []
             for sk, s in m.sections.items():
@@ -1395,6 +1392,8 @@ def put_threads() -> None:
         tobj.set_value('_short_display', f'[{inf.num}.{t.num}:{tidstr}]')
         tobj.set_value('_display', compute_thread_display(t))
         tobj.insert()
+        stackobj = trace.create_object(tpath+".Stack")
+        stackobj.insert()
     trace.proxy_object_path(
         THREADS_PATTERN.format(infnum=inf.num)).retain_values(keys)
 

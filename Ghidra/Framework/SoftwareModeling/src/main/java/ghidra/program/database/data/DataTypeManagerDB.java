@@ -25,6 +25,8 @@ import java.util.regex.Pattern;
 
 import javax.help.UnsupportedOperationException;
 
+import org.apache.commons.lang3.StringUtils;
+
 import db.*;
 import db.util.ErrorHandler;
 import generic.jar.ResourceFile;
@@ -1236,6 +1238,12 @@ abstract public class DataTypeManagerDB implements DataTypeManager {
 			return dataType;
 		}
 
+		if (dataType instanceof BadDataType) {
+			// Avoid adding BAD data type to the manager which 
+			// will appear when needed for a missing datatype
+			return BadDataType.dataType;
+		}
+
 		if (dataType instanceof BitFieldDataType) {
 			return resolveBitFieldDataType((BitFieldDataType) dataType, handler);
 		}
@@ -1876,20 +1884,17 @@ abstract public class DataTypeManagerDB implements DataTypeManager {
 
 	@Override
 	public DataType replaceDataType(DataType existingDt, DataType replacementDt,
-			boolean updateCategoryPath) throws DataTypeDependencyException {
-		// Note: we should probably disallow replacementDt to be an instanceof
-		// Dynamic or FactoryDataType
+			boolean updateCategoryPath)
+			throws DataTypeDependencyException, IllegalArgumentException {
 		lock.acquire();
 		try {
-			// Don't support replacement with Factory or Dynamic datatype
-			if (replacementDt instanceof Dynamic || replacementDt instanceof FactoryDataType) {
-				throw new IllegalArgumentException(
-					"Datatype replacment with dynamic or factory type not permitted.");
-			}
-			if (getID(existingDt) < 0) {
+			if (!contains(existingDt)) {
 				throw new IllegalArgumentException(
 					"Datatype to replace is not contained in this datatype manager.");
 			}
+
+			DataTypeUtilities.checkValidReplacement(existingDt, replacementDt);
+
 			boolean fixupName = false;
 			if (!contains(replacementDt)) {
 				replacementDt = replacementDt.clone(this);
@@ -1989,12 +1994,21 @@ abstract public class DataTypeManagerDB implements DataTypeManager {
 			dataTypeReplacementMap.put(replacedId, replacementId);
 		}
 
-		// perform any neccessary external use replacements
+		// perform any necessary external use replacements
 		replaceDataTypesUsed(dataTypeReplacementMap);
 
 		// perform actual database updates (e.g., record updates, change notifications, etc.)
 		for (Pair<DataType, DataType> dataTypeReplacement : dataTypeReplacements) {
-			replaceDataType(dataTypeReplacement.first, dataTypeReplacement.second);
+
+			DataType replacedDt = dataTypeReplacement.first;
+			DataType replacementDt = dataTypeReplacement.second;
+
+			long replacedId = getID(replacedDt);
+
+			deleteDataType(replacedId, false); // notify as replacement next
+
+			// Provide replacement notification
+			dataTypeReplaced(replacedId, replacedDt.getDataTypePath(), replacementDt);
 		}
 	}
 
@@ -2003,26 +2017,6 @@ abstract public class DataTypeManagerDB implements DataTypeManager {
 	 * @param dataTypeReplacementMap map of datatype replacements (oldID maps to replacementID).
 	 */
 	abstract protected void replaceDataTypesUsed(Map<Long, Long> dataTypeReplacementMap);
-
-	private void replaceDataType(DataType replacedDt, DataType replacementDt) {
-
-		DataTypePath replacedDtPath = replacedDt.getDataTypePath();
-		long replacedId = getID(replacedDt);
-
-		UniversalID id = replacedDt.getUniversalID();
-		idsToDataTypeMap.removeDataType(replacedDt.getSourceArchive(), id);
-
-		try {
-			parentChildAdapter.removeAllRecordsForParent(replacedId);
-		}
-		catch (IOException e) {
-			dbError(e);
-		}
-		deleteDataTypeRecord(replacedId);
-		dtCache.delete(replacedId);
-
-		dataTypeReplaced(replacedId, replacedDtPath, replacementDt);
-	}
 
 	private void replaceUsesInOtherDataTypes(DataType existingDt, DataType newDt) {
 		if (existingDt instanceof DataTypeDB) {
@@ -2098,32 +2092,37 @@ abstract public class DataTypeManagerDB implements DataTypeManager {
 
 	@Override
 	public void findDataTypes(String name, List<DataType> list) {
-		if (name == null || name.length() == 0) {
+		if (StringUtils.isBlank(name)) {
 			return;
 		}
 		if (name.equals(DataType.DEFAULT.getName())) {
 			list.add(DataType.DEFAULT);
 			return;
 		}
+
 		// ignore .conflict in both name and result matches
 		lock.acquire();
 		try {
 			buildSortedDataTypeList();
 			// Use exemplar datatype in root category without .conflict to position at start
 			// of possible matches
-			name = DataTypeUtilities.getNameWithoutConflict(name);
+			String baseName = DataTypeUtilities.getNameWithoutConflict(name);
 			DataType compareDataType =
-				new TypedefDataType(CategoryPath.ROOT, name, DataType.DEFAULT, this);
+				new TypedefDataType(CategoryPath.ROOT, baseName, DataType.DEFAULT, this);
 			int index = Collections.binarySearch(sortedDataTypes, compareDataType, nameComparator);
 			if (index < 0) {
+				// this allows us to find foo.conflict types
 				index = -index - 1;
 			}
+
 			// add all matches to list
 			while (index < sortedDataTypes.size()) {
 				DataType dt = sortedDataTypes.get(index);
-				if (!name.equals(DataTypeUtilities.getNameWithoutConflict(dt, false))) {
-					break;
+				String baseDtName = DataTypeUtilities.getNameWithoutConflict(dt, false);
+				if (!baseName.equals(baseDtName)) {
+					break; // not foo or foo.conflict
 				}
+
 				list.add(dt);
 				++index;
 			}
@@ -2143,9 +2142,9 @@ abstract public class DataTypeManagerDB implements DataTypeManager {
 			list.add(DataType.DEFAULT);
 			return;
 		}
-		if (monitor == null) {
-			monitor = TaskMonitor.DUMMY;
-		}
+
+		monitor = TaskMonitor.dummyIfNull(monitor);
+
 		Pattern regexp = UserSearchUtils.createSearchPattern(name, caseSensitive);
 		lock.acquire();
 		try {
@@ -2336,12 +2335,20 @@ abstract public class DataTypeManagerDB implements DataTypeManager {
 			return false;
 		}
 
+		if (dataType instanceof BadDataType) {
+			// Cannot really replace BAD datatype use as a place holder - just its managed instance 
+			deleteDataType(BAD_DATATYPE_ID, true);
+			return true;
+		}
+
 		long id = getID(dataType);
 		if (id <= 0) { // removal of certain special types not permitted
 			return false;
 		}
 
-		idsToDelete.add(id);
+		// Queue datatype for removal
+		addDataTypeToDelete(dataType, id);
+
 		removeQueuedDataTypes();
 		return true;
 	}
@@ -2358,7 +2365,8 @@ abstract public class DataTypeManagerDB implements DataTypeManager {
 				continue;
 			}
 
-			idsToDelete.add(id);
+			// Queue datatype for removal
+			addDataTypeToDelete(dt, id);
 		}
 
 		removeQueuedDataTypes();
@@ -2386,7 +2394,7 @@ abstract public class DataTypeManagerDB implements DataTypeManager {
 					"' has been retained for use by defined bitfields");
 				continue;
 			}
-			deleteDataType(id);
+			deleteDataType(id, true);
 		}
 		blockedRemovalsByID = null;
 	}
@@ -2540,7 +2548,10 @@ abstract public class DataTypeManagerDB implements DataTypeManager {
 	 * Queue a datatype to deleted in response to another datatype being deleted.
 	 * @param id datatype ID to be removed
 	 */
-	protected void addDataTypeToDelete(long id) {
+	protected void addDataTypeToDelete(DataType dt, long id) {
+		if (dt instanceof DataTypeDB dbDt) {
+			dbDt.deleteStarted();
+		}
 		idsToDelete.add(Long.valueOf(id));
 	}
 
@@ -2555,6 +2566,9 @@ abstract public class DataTypeManagerDB implements DataTypeManager {
 		Objects.requireNonNull(replacementDataType);
 		if (oldDataType == replacementDataType) {
 			throw new AssertionError("Invalid datatype replacement pair");
+		}
+		if (oldDataType instanceof DataTypeDB dbDt) {
+			dbDt.deleteStarted();
 		}
 		typesToReplace.add(new Pair<>(oldDataType, replacementDataType));
 	}
@@ -2584,7 +2598,7 @@ abstract public class DataTypeManagerDB implements DataTypeManager {
 
 	}
 
-	private void deleteDataType(long dataTypeID) {
+	private void deleteDataType(long dataTypeID, boolean notify) {
 
 		DataType dataType = getDataType(dataTypeID);
 		if (dataType == null) {
@@ -2596,6 +2610,7 @@ abstract public class DataTypeManagerDB implements DataTypeManager {
 		}
 
 		deleteDataTypeRecord(dataTypeID);
+
 		try {
 			parentChildAdapter.removeAllRecordsForParent(dataTypeID);
 		}
@@ -2604,10 +2619,13 @@ abstract public class DataTypeManagerDB implements DataTypeManager {
 		}
 		dtCache.delete(dataTypeID);
 		favoritesList.remove(dataType);
-		// DT Should delete data type update the sync time or last change time?
-//		updateLastSyncTime((new Date()).getTime()); // Update my Last Sync Time in the Archive ID table.
-		DataTypePath deletedDtPath = dataType.getDataTypePath();
-		dataTypeDeleted(dataTypeID, deletedDtPath);
+
+		// NOTE: There is no need to update archive sync time for removal.  It is only the
+		// possible updates to other datatypes that would need to trigger such a modification time.
+
+		if (notify) {
+			dataTypeDeleted(dataTypeID, dataType.getDataTypePath());
+		}
 	}
 
 	private void deleteDataTypeRecord(long dataTypeID) {
@@ -2926,15 +2944,11 @@ abstract public class DataTypeManagerDB implements DataTypeManager {
 
 				if (allowsDefaultBuiltInSettings() &&
 					builtInDt.getSettingsDefinitions().length != 0) {
+					// Alter built-in datatype instance to use new DB-backed default settings which 
+					// facilitates user adjustments to the original default settings.
 					DataTypeSettingsDB settings =
 						new DataTypeSettingsDB(this, builtInDt, dataTypeID);
-					if (builtInDt instanceof TypeDef) {
-						// Copy default immutable builtin typedef settings
-						Settings typedefSettings = builtInDt.getDefaultSettings();
-						for (String n : typedefSettings.getNames()) {
-							settings.setValue(n, typedefSettings.getValue(n));
-						}
-					}
+					settings.setDefaultSettings(builtInDt.getDefaultSettings());
 					settings.setAllowedSettingPredicate(n -> isBuiltInSettingAllowed(builtInDt, n));
 					builtInDt.setDefaultSettings(settings);
 				}
@@ -4579,7 +4593,8 @@ abstract public class DataTypeManagerDB implements DataTypeManager {
 		}
 	}
 
-	private record DedupedConflicts(int processCnt, int replaceCnt) {}
+	private record DedupedConflicts(int processCnt, int replaceCnt) {
+	}
 
 	private DedupedConflicts doDedupeConflicts(DataType dataType) {
 
